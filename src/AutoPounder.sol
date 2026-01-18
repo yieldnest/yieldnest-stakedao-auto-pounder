@@ -17,10 +17,29 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
  */
 contract AutoPounder {
     // ============================================
+    // Structs
+    // ============================================
+    struct Config {
+        address vault;
+        address accountant;
+        address gauge;
+        address rewardToken;
+        address baseAsset;
+        address curvePool1;
+        address curvePool2;
+        address erc4626_1;
+        address erc4626_2;
+        int128 curvePool1_rewardIndex;
+        int128 curvePool1_baseAssetIndex;
+        int128 curvePool2_assetIndex;
+    }
+
+    // ============================================
     // Errors
     // ============================================
     error InvalidVault();
     error InvalidAccountant();
+    error InvalidGauge();
     error InvalidRewardToken();
     error InvalidBaseAsset();
     error InvalidCurvePool();
@@ -55,6 +74,7 @@ contract AutoPounder {
     address public owner;
     address public vault;
     address public accountant;
+    address public gauge; // StakeDAO gauge to claim from
     address public rewardToken;
     address public baseAsset;
     address public curvePool1; // Pool for swapping reward -> base asset
@@ -81,31 +101,20 @@ contract AutoPounder {
     // ============================================
     // Constructor
     // ============================================
-    constructor(
-        address _vault,
-        address _accountant,
-        address _rewardToken,
-        address _baseAsset,
-        address _curvePool1,
-        address _curvePool2,
-        address _erc4626_1,
-        address _erc4626_2,
-        int128 _curvePool1_rewardIndex,
-        int128 _curvePool1_baseAssetIndex,
-        int128 _curvePool2_assetIndex
-    ) {
+    constructor(Config memory config) {
         owner = msg.sender;
-        vault = _vault;
-        accountant = _accountant;
-        rewardToken = _rewardToken;
-        baseAsset = _baseAsset;
-        curvePool1 = _curvePool1;
-        curvePool2 = _curvePool2;
-        erc4626_1 = _erc4626_1;
-        erc4626_2 = _erc4626_2;
-        curvePool1_rewardIndex = _curvePool1_rewardIndex;
-        curvePool1_baseAssetIndex = _curvePool1_baseAssetIndex;
-        curvePool2_assetIndex = _curvePool2_assetIndex;
+        vault = config.vault;
+        accountant = config.accountant;
+        gauge = config.gauge;
+        rewardToken = config.rewardToken;
+        baseAsset = config.baseAsset;
+        curvePool1 = config.curvePool1;
+        curvePool2 = config.curvePool2;
+        erc4626_1 = config.erc4626_1;
+        erc4626_2 = config.erc4626_2;
+        curvePool1_rewardIndex = config.curvePool1_rewardIndex;
+        curvePool1_baseAssetIndex = config.curvePool1_baseAssetIndex;
+        curvePool2_assetIndex = config.curvePool2_assetIndex;
 
         _validateConfig();
     }
@@ -154,35 +163,31 @@ contract AutoPounder {
     /**
      * @notice Updates configuration parameters
      */
-    function updateConfig(
-        address _vault,
-        address _accountant,
-        address _rewardToken,
-        address _baseAsset,
-        address _curvePool1,
-        address _curvePool2,
-        address _erc4626_1,
-        address _erc4626_2,
-        int128 _curvePool1_rewardIndex,
-        int128 _curvePool1_baseAssetIndex,
-        int128 _curvePool2_assetIndex
-    ) external onlyOwner {
-        vault = _vault;
-        accountant = _accountant;
-        rewardToken = _rewardToken;
-        baseAsset = _baseAsset;
-        curvePool1 = _curvePool1;
-        curvePool2 = _curvePool2;
-        erc4626_1 = _erc4626_1;
-        erc4626_2 = _erc4626_2;
-        curvePool1_rewardIndex = _curvePool1_rewardIndex;
-        curvePool1_baseAssetIndex = _curvePool1_baseAssetIndex;
-        curvePool2_assetIndex = _curvePool2_assetIndex;
+    function updateConfig(Config memory config) external onlyOwner {
+        vault = config.vault;
+        accountant = config.accountant;
+        gauge = config.gauge;
+        rewardToken = config.rewardToken;
+        baseAsset = config.baseAsset;
+        curvePool1 = config.curvePool1;
+        curvePool2 = config.curvePool2;
+        erc4626_1 = config.erc4626_1;
+        erc4626_2 = config.erc4626_2;
+        curvePool1_rewardIndex = config.curvePool1_rewardIndex;
+        curvePool1_baseAssetIndex = config.curvePool1_baseAssetIndex;
+        curvePool2_assetIndex = config.curvePool2_assetIndex;
 
         _validateConfig();
 
         emit ConfigUpdated(
-            _vault, _accountant, _rewardToken, _baseAsset, _curvePool1, _curvePool2, _erc4626_1, _erc4626_2
+            config.vault,
+            config.accountant,
+            config.rewardToken,
+            config.baseAsset,
+            config.curvePool1,
+            config.curvePool2,
+            config.erc4626_1,
+            config.erc4626_2
         );
     }
 
@@ -218,14 +223,21 @@ contract AutoPounder {
      * @dev Step 1: Claims rewards from accountant via vault processor
      */
     function _claimRewards() internal returns (uint256) {
-        // Prepare processor call to claim() on accountant
+        // Prepare processor call to claim(address[],bytes[]) on accountant
         address[] memory targets = new address[](1);
         uint256[] memory values = new uint256[](1);
         bytes[] memory data = new bytes[](1);
 
+        // Prepare arrays for claim function arguments with gauge address
+        address[] memory claimTargets = new address[](1);
+        bytes[] memory claimData = new bytes[](1);
+
+        claimTargets[0] = gauge;
+        claimData[0] = ""; // Empty bytes for the gauge
+
         targets[0] = accountant;
         values[0] = 0;
-        data[0] = abi.encodeWithSignature("claim()");
+        data[0] = abi.encodeWithSignature("claim(address[],bytes[])", claimTargets, claimData);
 
         // Execute via vault processor
         bytes[] memory results = IVault(vault).processor(targets, values, data);
@@ -267,11 +279,7 @@ contract AutoPounder {
         // Execute Curve exchange
         // exchange(int128 i, int128 j, uint256 dx, uint256 min_dy)
         bytes memory callData = abi.encodeWithSignature(
-            "exchange(int128,int128,uint256,uint256)",
-            curvePool1_rewardIndex,
-            curvePool1_baseAssetIndex,
-            amount,
-            minOut
+            "exchange(int128,int128,uint256,uint256)", curvePool1_rewardIndex, curvePool1_baseAssetIndex, amount, minOut
         );
 
         (bool success, bytes memory result) = curvePool1.call(callData);
@@ -372,6 +380,7 @@ contract AutoPounder {
     function _validateConfig() internal view {
         if (vault == address(0)) revert InvalidVault();
         if (accountant == address(0)) revert InvalidAccountant();
+        if (gauge == address(0)) revert InvalidGauge();
         if (rewardToken == address(0)) revert InvalidRewardToken();
         if (baseAsset == address(0)) revert InvalidBaseAsset();
         if (curvePool1 == address(0)) revert InvalidCurvePool();
