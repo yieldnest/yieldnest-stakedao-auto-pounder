@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
+import {console} from "forge-std/console.sol";
 
 interface AggregatorV3Interface {
     function decimals() external view returns (uint8);
@@ -152,32 +153,50 @@ contract AutoPounder {
      * @dev All minimum outputs are calculated internally using oracle prices and minOutputBps
      */
     function compound() external {
+        console.log("=== Starting compound() ===");
+
         // Step 1: Claim rewards from accountant via processor
+        console.log("Step 1: Claiming rewards...");
         uint256 rewardAmount = _claimRewards();
+        console.log("Claimed reward amount:", rewardAmount);
         emit RewardsClaimed(vault, rewardAmount);
 
         // Step 2: Transfer rewards to this contract via processor
+        console.log("Step 2: Transferring rewards to self...");
         _transferRewardsToSelf(rewardAmount);
+        console.log("Rewards transferred successfully");
 
         // Step 3: Swap rewards for base asset in Curve pool #1
         // minOut is calculated inside using oracle prices
+        console.log("Step 3: Swapping rewards for base asset...");
         uint256 baseAssetAmount = _swapRewardForBaseAsset(rewardAmount);
+        console.log("Base asset amount received:", baseAssetAmount);
         emit RewardsSwapped(rewardAmount, baseAssetAmount);
 
         // Step 4: Deposit base asset into ERC4626 vault #1
+        console.log("Step 4: Depositing base asset to ERC4626_1...");
         uint256 intermediateShares = _depositToERC4626_1(baseAssetAmount);
+        console.log("Intermediate shares received:", intermediateShares);
         emit BaseAssetDeposited(baseAssetAmount, intermediateShares);
 
         // Step 5: Single-sided deposit into Curve pool #2
+        console.log("Step 5: Adding liquidity single-sided...");
         uint256 lpTokenAmount = _addLiquiditySingleSided(intermediateShares);
+        console.log("LP token amount received:", lpTokenAmount);
         emit LiquidityAdded(intermediateShares, lpTokenAmount);
 
         // Step 6: Transfer LP tokens back to vault via processor
+        console.log("Step 6: Transferring LP tokens to vault...");
         _transferLPToVault(lpTokenAmount);
+        console.log("LP tokens transferred successfully");
 
         // Step 7: Deposit LP into ERC4626 #2 (2nd asset in vault) via processor
+        console.log("Step 7: Depositing LP to ERC4626_2...");
         uint256 finalShares = _depositLPToVault(lpTokenAmount);
+        console.log("Final shares received:", finalShares);
         emit LPDeposited(lpTokenAmount, finalShares);
+
+        console.log("=== Compound completed successfully ===");
     }
 
     /**
@@ -253,6 +272,9 @@ contract AutoPounder {
      * @dev Step 1: Claims rewards from accountant via vault processor
      */
     function _claimRewards() internal returns (uint256) {
+        // Check balance before claim
+        uint256 balanceBefore = IERC20(rewardToken).balanceOf(vault);
+
         // Prepare processor call to claim(address[],bytes[]) on accountant
         address[] memory targets = new address[](1);
         uint256[] memory values = new uint256[](1);
@@ -269,13 +291,14 @@ contract AutoPounder {
         values[0] = 0;
         data[0] = abi.encodeWithSignature("claim(address[],bytes[])", claimTargets, claimData);
 
-        // Execute via vault processor
-        bytes[] memory results = IVault(vault).processor(targets, values, data);
+        // Execute via vault processor (claim() returns nothing)
+        IVault(vault).processor(targets, values, data);
 
-        if (results.length == 0) revert ProcessorCallFailed(0);
+        // Check balance after claim to determine amount claimed
+        uint256 balanceAfter = IERC20(rewardToken).balanceOf(vault);
 
-        // Return amount claimed (assuming claim() returns uint256)
-        return abi.decode(results[0], (uint256));
+        // Return the difference (amount claimed)
+        return balanceAfter - balanceBefore;
     }
 
     /**
