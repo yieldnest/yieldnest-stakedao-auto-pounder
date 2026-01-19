@@ -51,7 +51,7 @@ library MainnetContracts {
 
     /// @notice Curve pool for single-sided deposit to get LP tokens
     /// @dev This is curvePool2 in AutoPounder - need to identify correct pool
-    address public constant CURVE_STAK_POOL = 0x0000000000000000000000000000000000000000; // TODO: Verify STAK pool address
+    address public constant CURVE_STAK_POOL = 0xFFd3b4D343A8964a5C3c1caAc20f319C41A97BFF; // TODO: Verify STAK pool address
 
     // Curve pool indices for CRV/USDC pool
     /// @notice Index of USDC in the CRV/USDC pool
