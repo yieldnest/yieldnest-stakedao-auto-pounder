@@ -110,8 +110,8 @@ contract AutoPounder {
     // Slippage protection (basis points, e.g., 9900 = 99% = 1% slippage)
     uint256 public minOutputBps = 9900;
 
-    // Oracle staleness threshold (e.g., 3600 = 1 hour)
-    uint256 public maxOracleAge = 3600;
+    // Oracle staleness threshold (e.g., 86400 = 24 hours)
+    uint256 public maxOracleAge = 86400;
 
     // ============================================
     // Modifiers
