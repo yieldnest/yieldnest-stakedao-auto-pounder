@@ -46,6 +46,10 @@ contract BaseIntegrationTest is Test {
         require(stakAssets.length >= 2, "STAK vault doesn't have 2 assets");
         address erc4626_2 = stakAssets[1];
 
+
+        // Sample TX swap from CRV to USDC
+        // https://etherscan.io/tx/0x43ebed15169878c0ba0e2578d20e5fdc6a2c47cbc81af8876baca6842b8ce1b4
+
         // Build AutoPounder configuration
         AutoPounder.Config memory config = AutoPounder.Config({
             vault: STAK,
