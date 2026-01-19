@@ -46,7 +46,7 @@ library MainnetContracts {
     // ============================================
 
     /// @notice Curve Router for multi-hop swaps
-    address public constant CURVE_ROUTER = 0xF0d4c12A5768D806021F80a262B4d39d26C58b8D;
+    address public constant CURVE_ROUTER = 0x45312ea0eFf7E09C83CBE249fa1d7598c4C8cd4e;
 
     /// @notice Curve pool for single-sided deposit to get LP tokens
     /// @dev This is curvePool2 in AutoPounder
