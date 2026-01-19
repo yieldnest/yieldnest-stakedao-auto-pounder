@@ -39,8 +39,8 @@ contract AutoPounder {
         address erc4626_2;
         address rewardTokenOracle; // Chainlink oracle for reward token price
         address baseAssetOracle; // Chainlink oracle for base asset price
-        address[11] swapRoute; // Route for CRV -> USDC swap
-        address[5] swapPools; // Pools for CRV -> USDC swap
+        address[11] swapRoute; // Route for rewardToken -> baseAsset swap
+        address[5] swapPools; // Pools for rewardToken -> baseAsset swap
         int128 curvePool2_assetIndex;
     }
 
@@ -100,8 +100,8 @@ contract AutoPounder {
     address public baseAssetOracle; // Chainlink price feed for base asset
 
     // Curve swap route parameters
-    address[11] public swapRoute; // Route for CRV -> USDC swap
-    address[5] public swapPools; // Pools for CRV -> USDC swap
+    address[11] public swapRoute; // Route for rewardToken -> baseAsset swap
+    address[5] public swapPools; // Pools for rewardToken -> baseAsset swap
 
     // Curve pool parameters
     int128 public curvePool2_assetIndex;
