@@ -33,14 +33,14 @@ contract AutoPounder {
         address gauge;
         address rewardToken;
         address baseAsset;
-        address curvePool1;
+        address curveRouter; // Curve router for swaps
         address curvePool2;
         address erc4626_1;
         address erc4626_2;
         address rewardTokenOracle; // Chainlink oracle for reward token price
         address baseAssetOracle; // Chainlink oracle for base asset price
-        int128 curvePool1_rewardIndex;
-        int128 curvePool1_baseAssetIndex;
+        address[11] swapRoute; // Route for CRV -> USDC swap
+        address[5] swapPools; // Pools for CRV -> USDC swap
         int128 curvePool2_assetIndex;
     }
 
@@ -53,6 +53,7 @@ contract AutoPounder {
     error InvalidRewardToken();
     error InvalidBaseAsset();
     error InvalidCurvePool();
+    error InvalidCurveRouter();
     error InvalidERC4626();
     error InvalidOracle();
     error StaleOraclePrice();
@@ -89,7 +90,7 @@ contract AutoPounder {
     address public gauge; // StakeDAO gauge to claim from
     address public rewardToken;
     address public baseAsset;
-    address public curvePool1; // Pool for swapping reward -> base asset
+    address public curveRouter; // Curve router for swaps
     address public curvePool2; // Pool for single-sided deposit
     address public erc4626_1; // ERC4626 for base asset
     address public erc4626_2; // ERC4626 for LP tokens (2nd asset in vault)
@@ -98,9 +99,11 @@ contract AutoPounder {
     address public rewardTokenOracle; // Chainlink price feed for reward token
     address public baseAssetOracle; // Chainlink price feed for base asset
 
+    // Curve swap route parameters
+    address[11] public swapRoute; // Route for CRV -> USDC swap
+    address[5] public swapPools; // Pools for CRV -> USDC swap
+
     // Curve pool parameters
-    int128 public curvePool1_rewardIndex;
-    int128 public curvePool1_baseAssetIndex;
     int128 public curvePool2_assetIndex;
 
     // Slippage protection (basis points, e.g., 9900 = 99% = 1% slippage)
@@ -127,14 +130,14 @@ contract AutoPounder {
         gauge = config.gauge;
         rewardToken = config.rewardToken;
         baseAsset = config.baseAsset;
-        curvePool1 = config.curvePool1;
+        curveRouter = config.curveRouter;
         curvePool2 = config.curvePool2;
         erc4626_1 = config.erc4626_1;
         erc4626_2 = config.erc4626_2;
         rewardTokenOracle = config.rewardTokenOracle;
         baseAssetOracle = config.baseAssetOracle;
-        curvePool1_rewardIndex = config.curvePool1_rewardIndex;
-        curvePool1_baseAssetIndex = config.curvePool1_baseAssetIndex;
+        swapRoute = config.swapRoute;
+        swapPools = config.swapPools;
         curvePool2_assetIndex = config.curvePool2_assetIndex;
 
         _validateConfig();
@@ -186,14 +189,14 @@ contract AutoPounder {
         gauge = config.gauge;
         rewardToken = config.rewardToken;
         baseAsset = config.baseAsset;
-        curvePool1 = config.curvePool1;
+        curveRouter = config.curveRouter;
         curvePool2 = config.curvePool2;
         erc4626_1 = config.erc4626_1;
         erc4626_2 = config.erc4626_2;
         rewardTokenOracle = config.rewardTokenOracle;
         baseAssetOracle = config.baseAssetOracle;
-        curvePool1_rewardIndex = config.curvePool1_rewardIndex;
-        curvePool1_baseAssetIndex = config.curvePool1_baseAssetIndex;
+        swapRoute = config.swapRoute;
+        swapPools = config.swapPools;
         curvePool2_assetIndex = config.curvePool2_assetIndex;
 
         _validateConfig();
@@ -203,7 +206,7 @@ contract AutoPounder {
             config.accountant,
             config.rewardToken,
             config.baseAsset,
-            config.curvePool1,
+            config.curveRouter,
             config.curvePool2,
             config.erc4626_1,
             config.erc4626_2
@@ -294,24 +297,32 @@ contract AutoPounder {
     }
 
     /**
-     * @dev Step 3: Swaps reward token for base asset using Curve pool
+     * @dev Step 3: Swaps reward token for base asset using Curve router
      */
     function _swapRewardForBaseAsset(uint256 amount) internal returns (uint256) {
-        // Approve Curve pool to spend reward tokens
-        IERC20(rewardToken).approve(curvePool1, amount);
+        // Approve Curve router to spend reward tokens
+        IERC20(rewardToken).approve(curveRouter, amount);
 
         // Calculate minimum output using oracle prices and slippage protection
         uint256 expectedOutput = _calculateExpectedOutput(amount, rewardTokenOracle, baseAssetOracle);
         uint256 minOut = (expectedOutput * minOutputBps) / 10000;
 
-        // Execute Curve exchange
-        // exchange(int128 i, int128 j, uint256 dx, uint256 min_dy)
+        // Prepare swap params (all zeros for default behavior)
+        uint256[5][5] memory swapParams;
+
+        // Execute Curve router exchange
+        // exchange(address[11] _route, uint256[5][5] _swap_params, uint256 _amount, uint256 _min_dy, address[5] _pools)
         bytes memory callData = abi.encodeWithSignature(
-            "exchange(int128,int128,uint256,uint256)", curvePool1_rewardIndex, curvePool1_baseAssetIndex, amount, minOut
+            "exchange(address[11],uint256[5][5],uint256,uint256,address[5])",
+            swapRoute,
+            swapParams,
+            amount,
+            minOut,
+            swapPools
         );
 
-        (bool success, bytes memory result) = curvePool1.call(callData);
-        require(success, "Curve swap failed");
+        (bool success, bytes memory result) = curveRouter.call(callData);
+        require(success, "Curve router swap failed");
 
         return abi.decode(result, (uint256));
     }
@@ -430,11 +441,11 @@ contract AutoPounder {
 
         // Calculate: (inputAmount * inputPrice) / outputPrice, adjusting for decimals
         if (inputDecimals >= outputDecimals) {
-            expectedOutput = (inputAmount * uint256(inputPrice))
-                / (uint256(outputPrice) * 10 ** (inputDecimals - outputDecimals));
+            expectedOutput =
+                (inputAmount * uint256(inputPrice)) / (uint256(outputPrice) * 10 ** (inputDecimals - outputDecimals));
         } else {
-            expectedOutput = (inputAmount * uint256(inputPrice) * 10 ** (outputDecimals - inputDecimals))
-                / uint256(outputPrice);
+            expectedOutput =
+                (inputAmount * uint256(inputPrice) * 10 ** (outputDecimals - inputDecimals)) / uint256(outputPrice);
         }
     }
 
@@ -447,12 +458,14 @@ contract AutoPounder {
         if (gauge == address(0)) revert InvalidGauge();
         if (rewardToken == address(0)) revert InvalidRewardToken();
         if (baseAsset == address(0)) revert InvalidBaseAsset();
-        if (curvePool1 == address(0)) revert InvalidCurvePool();
+        if (curveRouter == address(0)) revert InvalidCurveRouter();
         if (curvePool2 == address(0)) revert InvalidCurvePool();
         if (erc4626_1 == address(0)) revert InvalidERC4626();
         if (erc4626_2 == address(0)) revert InvalidERC4626();
         if (rewardTokenOracle == address(0)) revert InvalidOracle();
         if (baseAssetOracle == address(0)) revert InvalidOracle();
+        if (swapRoute[0] == address(0)) revert InvalidCurveRouter();
+        if (swapPools[0] == address(0)) revert InvalidCurveRouter();
     }
 }
 

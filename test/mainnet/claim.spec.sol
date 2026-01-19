@@ -12,7 +12,6 @@ import {AutoPounder} from "../../src/AutoPounder.sol";
  * @dev Tests full end-to-end claim and compounding functionality on mainnet fork
  */
 contract ClaimIntegrationTest is BaseIntegrationTest {
-
     /**
      * @notice Test that the AutoPounder is properly configured
      */
@@ -22,7 +21,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         assertEq(autoPounder.gauge(), GAUGE, "Gauge mismatch");
         assertEq(autoPounder.rewardToken(), CRV, "Reward token mismatch");
         assertEq(autoPounder.baseAsset(), USDC, "Base asset mismatch");
-        assertEq(autoPounder.curvePool1(), CURVE_CRV_USDC_POOL, "Curve pool 1 mismatch");
+        assertEq(autoPounder.curveRouter(), CURVE_ROUTER, "Curve router mismatch");
         assertEq(autoPounder.rewardTokenOracle(), CHAINLINK_CRV_USD, "CRV oracle mismatch");
         assertEq(autoPounder.baseAssetOracle(), CHAINLINK_USDC_USD, "USDC oracle mismatch");
         assertEq(autoPounder.owner(), deployer, "Owner mismatch");
@@ -33,16 +32,14 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
      */
     function test_OraclePrices() public view {
         // Query CRV oracle
-        (, int256 crvPrice,, uint256 crvUpdatedAt,) =
-            AggregatorV3Interface(CHAINLINK_CRV_USD).latestRoundData();
+        (, int256 crvPrice,, uint256 crvUpdatedAt,) = AggregatorV3Interface(CHAINLINK_CRV_USD).latestRoundData();
 
         assertGt(crvPrice, 0, "CRV price should be positive");
         assertGt(crvUpdatedAt, 0, "CRV oracle should have update time");
         assertLt(block.timestamp - crvUpdatedAt, 86400, "CRV price should be recent (< 1 day)");
 
         // Query USDC oracle
-        (, int256 usdcPrice,, uint256 usdcUpdatedAt,) =
-            AggregatorV3Interface(CHAINLINK_USDC_USD).latestRoundData();
+        (, int256 usdcPrice,, uint256 usdcUpdatedAt,) = AggregatorV3Interface(CHAINLINK_USDC_USD).latestRoundData();
 
         assertGt(usdcPrice, 0, "USDC price should be positive");
         assertGt(usdcUpdatedAt, 0, "USDC oracle should have update time");
@@ -102,20 +99,23 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
     function test_OnlyOwnerCanUpdateConfig() public {
         address attacker = makeAddr("attacker");
 
+        address[11] memory dummyRoute;
+        address[5] memory dummyPools;
+
         AutoPounder.Config memory newConfig = AutoPounder.Config({
             vault: address(0x1),
             accountant: address(0x2),
             gauge: address(0x3),
             rewardToken: address(0x4),
             baseAsset: address(0x5),
-            curvePool1: address(0x6),
+            curveRouter: address(0x6),
             curvePool2: address(0x7),
             erc4626_1: address(0x8),
             erc4626_2: address(0x9),
             rewardTokenOracle: address(0xA),
             baseAssetOracle: address(0xB),
-            curvePool1_rewardIndex: 0,
-            curvePool1_baseAssetIndex: 1,
+            swapRoute: dummyRoute,
+            swapPools: dummyPools,
             curvePool2_assetIndex: 0
         });
 
@@ -195,16 +195,8 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
 
         uint256 finalOwnerBalance = IERC20(USDC).balanceOf(deployer);
 
-        assertEq(
-            finalOwnerBalance - initialOwnerBalance,
-            1000e6,
-            "Owner should receive recovered tokens"
-        );
-        assertEq(
-            IERC20(USDC).balanceOf(address(autoPounder)),
-            0,
-            "AutoPounder should have no USDC left"
-        );
+        assertEq(finalOwnerBalance - initialOwnerBalance, 1000e6, "Owner should receive recovered tokens");
+        assertEq(IERC20(USDC).balanceOf(address(autoPounder)), 0, "AutoPounder should have no USDC left");
     }
 
     /**
@@ -228,8 +220,9 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
      * @notice Test Curve pool configuration
      */
     function test_CurvePoolIndices() public view {
-        assertEq(autoPounder.curvePool1_rewardIndex(), CURVE_CRV_USDC_CRV_INDEX);
-        assertEq(autoPounder.curvePool1_baseAssetIndex(), CURVE_CRV_USDC_USDC_INDEX);
+        // Check swap route configuration
+        assertEq(autoPounder.swapRoute(0), CRV, "Route[0] should be CRV");
+        assertEq(autoPounder.swapRoute(4), USDC, "Route[4] should be USDC");
         assertEq(autoPounder.curvePool2_assetIndex(), CURVE_STAK_ASSET_INDEX);
     }
 }
@@ -239,11 +232,5 @@ interface AggregatorV3Interface {
     function latestRoundData()
         external
         view
-        returns (
-            uint80 roundId,
-            int256 answer,
-            uint256 startedAt,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        );
+        returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);
 }

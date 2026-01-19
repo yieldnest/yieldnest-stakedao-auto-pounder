@@ -22,13 +22,11 @@ contract BaseIntegrationTest is Test {
     address constant USDC = MainnetContracts.USDC;
     address constant GAUGE = MainnetContracts.GAUGE;
     address constant YN_RWAX = MainnetContracts.YN_RWAX;
-    address constant CURVE_CRV_USDC_POOL = MainnetContracts.CURVE_CRV_USDC_POOL;
+    address constant CURVE_ROUTER = MainnetContracts.CURVE_ROUTER;
     address constant CURVE_STAK_POOL = MainnetContracts.CURVE_STAK_POOL;
     address constant CHAINLINK_CRV_USD = MainnetContracts.CHAINLINK_CRV_USD;
     address constant CHAINLINK_USDC_USD = MainnetContracts.CHAINLINK_USDC_USD;
 
-    int128 constant CURVE_CRV_USDC_CRV_INDEX = MainnetContracts.CURVE_CRV_USDC_CRV_INDEX;
-    int128 constant CURVE_CRV_USDC_USDC_INDEX = MainnetContracts.CURVE_CRV_USDC_USDC_INDEX;
     int128 constant CURVE_STAK_ASSET_INDEX = MainnetContracts.CURVE_STAK_ASSET_INDEX;
 
     // Test accounts
@@ -36,7 +34,6 @@ contract BaseIntegrationTest is Test {
     address vaultOwner;
 
     function setUp() public virtual {
-
         // Create test accounts
         deployer = makeAddr("deployer");
         vaultOwner = makeAddr("vaultOwner");
@@ -46,9 +43,9 @@ contract BaseIntegrationTest is Test {
         require(stakAssets.length >= 2, "STAK vault doesn't have 2 assets");
         address erc4626_2 = stakAssets[1];
 
-
-        // Sample TX swap from CRV to USDC
-        // https://etherscan.io/tx/0x43ebed15169878c0ba0e2578d20e5fdc6a2c47cbc81af8876baca6842b8ce1b4
+        // Get swap route and pools from MainnetContracts
+        address[11] memory swapRoute = MainnetContracts.getSwapRoute();
+        address[5] memory swapPools = MainnetContracts.getSwapPools();
 
         // Build AutoPounder configuration
         AutoPounder.Config memory config = AutoPounder.Config({
@@ -57,14 +54,14 @@ contract BaseIntegrationTest is Test {
             gauge: GAUGE,
             rewardToken: CRV,
             baseAsset: USDC,
-            curvePool1: CURVE_CRV_USDC_POOL,
+            curveRouter: CURVE_ROUTER,
             curvePool2: CURVE_STAK_POOL,
             erc4626_1: YN_RWAX,
             erc4626_2: erc4626_2,
             rewardTokenOracle: CHAINLINK_CRV_USD,
             baseAssetOracle: CHAINLINK_USDC_USD,
-            curvePool1_rewardIndex: CURVE_CRV_USDC_CRV_INDEX,
-            curvePool1_baseAssetIndex: CURVE_CRV_USDC_USDC_INDEX,
+            swapRoute: swapRoute,
+            swapPools: swapPools,
             curvePool2_assetIndex: CURVE_STAK_ASSET_INDEX
         });
 
