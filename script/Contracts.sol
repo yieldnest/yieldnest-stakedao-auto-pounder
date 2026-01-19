@@ -16,7 +16,7 @@ library MainnetContracts {
 
     /// @notice ynRWAx - ERC4626 vault for base asset (USDC)
     /// @dev This is erc4626_1 in AutoPounder
-    address public constant YN_RWAX = 0x3210ab8b1db4bf6f45b9D3b4cf59e0cD8C2E4E7A; // TODO: Verify actual address
+    address public constant YN_RWAX = 0x01Ba69727E2860b37bc1a2bd56999c1aFb4C15D8; // TODO: Verify actual address
 
     // ============================================
     // StakeDAO Contracts

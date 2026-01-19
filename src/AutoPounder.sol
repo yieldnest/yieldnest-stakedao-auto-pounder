@@ -42,6 +42,7 @@ contract AutoPounder {
         address baseAssetOracle; // Chainlink oracle for base asset price
         address[11] swapRoute; // Route for rewardToken -> baseAsset swap
         address[5] swapPools; // Pools for rewardToken -> baseAsset swap
+        uint256[5][5] swapParams; // Swap parameters for Curve router
         int128 curvePool2_assetIndex;
     }
 
@@ -103,6 +104,7 @@ contract AutoPounder {
     // Curve swap route parameters
     address[11] public swapRoute; // Route for rewardToken -> baseAsset swap
     address[5] public swapPools; // Pools for rewardToken -> baseAsset swap
+    uint256[5][5] public swapParams; // Swap parameters for Curve router
 
     // Curve pool parameters
     int128 public curvePool2_assetIndex;
@@ -139,6 +141,7 @@ contract AutoPounder {
         baseAssetOracle = config.baseAssetOracle;
         swapRoute = config.swapRoute;
         swapPools = config.swapPools;
+        swapParams = config.swapParams;
         curvePool2_assetIndex = config.curvePool2_assetIndex;
 
         _validateConfig();
@@ -216,6 +219,7 @@ contract AutoPounder {
         baseAssetOracle = config.baseAssetOracle;
         swapRoute = config.swapRoute;
         swapPools = config.swapPools;
+        swapParams = config.swapParams;
         curvePool2_assetIndex = config.curvePool2_assetIndex;
 
         _validateConfig();
@@ -330,10 +334,7 @@ contract AutoPounder {
         uint256 expectedOutput = _calculateExpectedOutput(amount, rewardTokenOracle, baseAssetOracle);
         uint256 minOut = (expectedOutput * minOutputBps) / 10000;
 
-        // Prepare swap params (all zeros for default behavior)
-        uint256[5][5] memory swapParams;
-
-        // Execute Curve router exchange
+        // Execute Curve router exchange using configured swap params
         // exchange(address[11] _route, uint256[5][5] _swap_params, uint256 _amount, uint256 _min_dy, address[5] _pools)
         bytes memory callData = abi.encodeWithSignature(
             "exchange(address[11],uint256[5][5],uint256,uint256,address[5])",
@@ -459,16 +460,24 @@ contract AutoPounder {
         if (block.timestamp - updatedAt2 > maxOracleAge) revert StaleOraclePrice();
 
         // Get oracle decimals
-        uint8 inputDecimals = AggregatorV3Interface(inputOracle).decimals();
-        uint8 outputDecimals = AggregatorV3Interface(outputOracle).decimals();
+        uint8 inputOracleDecimals = AggregatorV3Interface(inputOracle).decimals();
+        uint8 outputOracleDecimals = AggregatorV3Interface(outputOracle).decimals();
 
-        // Calculate: (inputAmount * inputPrice) / outputPrice, adjusting for decimals
-        if (inputDecimals >= outputDecimals) {
+        // Get token decimals (CRV=18, USDC=6)
+        uint8 inputTokenDecimals = IERC20Metadata(rewardToken).decimals();
+        uint8 outputTokenDecimals = IERC20Metadata(baseAsset).decimals();
+
+        // Calculate: (inputAmount * inputPrice) / outputPrice
+        // Then adjust for oracle decimals and token decimals
+        uint256 priceRatio = (uint256(inputPrice) * 10 ** outputOracleDecimals) / uint256(outputPrice);
+
+        // Adjust for token decimals: convert from input token decimals to output token decimals
+        if (inputTokenDecimals >= outputTokenDecimals) {
             expectedOutput =
-                (inputAmount * uint256(inputPrice)) / (uint256(outputPrice) * 10 ** (inputDecimals - outputDecimals));
+                (inputAmount * priceRatio) / (10 ** inputOracleDecimals * 10 ** (inputTokenDecimals - outputTokenDecimals));
         } else {
-            expectedOutput =
-                (inputAmount * uint256(inputPrice) * 10 ** (outputDecimals - inputDecimals)) / uint256(outputPrice);
+            expectedOutput = (inputAmount * priceRatio * 10 ** (outputTokenDecimals - inputTokenDecimals))
+                / 10 ** inputOracleDecimals;
         }
     }
 
@@ -505,4 +514,8 @@ interface IVault {
 interface IERC4626 {
     function asset() external view returns (address);
     function deposit(uint256 assets, address receiver) external returns (uint256 shares);
+}
+
+interface IERC20Metadata {
+    function decimals() external view returns (uint8);
 }

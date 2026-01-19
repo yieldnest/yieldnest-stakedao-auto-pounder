@@ -89,6 +89,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
 
         address[11] memory dummyRoute;
         address[5] memory dummyPools;
+        uint256[5][5] memory dummyParams;
 
         AutoPounder.Config memory newConfig = AutoPounder.Config({
             vault: address(0x1),
@@ -104,6 +105,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
             baseAssetOracle: address(0xB),
             swapRoute: dummyRoute,
             swapPools: dummyPools,
+            swapParams: dummyParams,
             curvePool2_assetIndex: 0
         });
 

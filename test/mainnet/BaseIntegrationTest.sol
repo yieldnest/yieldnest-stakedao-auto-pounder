@@ -76,6 +76,15 @@ contract BaseIntegrationTest is Test {
         address[11] memory swapRoute = MainnetContracts.getSwapRoute();
         address[5] memory swapPools = MainnetContracts.getSwapPools();
 
+        // Configure swap params: [i, j, swap_type, pool_type, n_coins] for each hop
+        // Values: 2,0,1,3,0,1,0,1,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        uint256[5][5] memory swapParams;
+        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
+        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
+        swapParams[2] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
+        swapParams[3] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
+        swapParams[4] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
+
         // Build AutoPounder configuration
         AutoPounder.Config memory config = AutoPounder.Config({
             vault: STAK,
@@ -91,6 +100,7 @@ contract BaseIntegrationTest is Test {
             baseAssetOracle: CHAINLINK_USDC_USD,
             swapRoute: swapRoute,
             swapPools: swapPools,
+            swapParams: swapParams,
             curvePool2_assetIndex: CURVE_STAK_ASSET_INDEX
         });
 
