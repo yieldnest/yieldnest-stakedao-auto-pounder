@@ -3,6 +3,14 @@ pragma solidity ^0.8.20;
 
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
+interface AggregatorV3Interface {
+    function decimals() external view returns (uint8);
+    function latestRoundData()
+        external
+        view
+        returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);
+}
+
 /**
  * @title AutoPounder
  * @notice Contract that automates the reward compounding process for StakeDAO vaults
@@ -29,6 +37,8 @@ contract AutoPounder {
         address curvePool2;
         address erc4626_1;
         address erc4626_2;
+        address rewardTokenOracle; // Chainlink oracle for reward token price
+        address baseAssetOracle; // Chainlink oracle for base asset price
         int128 curvePool1_rewardIndex;
         int128 curvePool1_baseAssetIndex;
         int128 curvePool2_assetIndex;
@@ -44,6 +54,8 @@ contract AutoPounder {
     error InvalidBaseAsset();
     error InvalidCurvePool();
     error InvalidERC4626();
+    error InvalidOracle();
+    error StaleOraclePrice();
     error InsufficientOutput();
     error ProcessorCallFailed(uint256 index);
     error TransferFailed();
@@ -82,6 +94,10 @@ contract AutoPounder {
     address public erc4626_1; // ERC4626 for base asset
     address public erc4626_2; // ERC4626 for LP tokens (2nd asset in vault)
 
+    // Chainlink oracles
+    address public rewardTokenOracle; // Chainlink price feed for reward token
+    address public baseAssetOracle; // Chainlink price feed for base asset
+
     // Curve pool parameters
     int128 public curvePool1_rewardIndex;
     int128 public curvePool1_baseAssetIndex;
@@ -89,6 +105,9 @@ contract AutoPounder {
 
     // Slippage protection (basis points, e.g., 9900 = 99% = 1% slippage)
     uint256 public minOutputBps = 9900;
+
+    // Oracle staleness threshold (e.g., 3600 = 1 hour)
+    uint256 public maxOracleAge = 3600;
 
     // ============================================
     // Modifiers
@@ -112,6 +131,8 @@ contract AutoPounder {
         curvePool2 = config.curvePool2;
         erc4626_1 = config.erc4626_1;
         erc4626_2 = config.erc4626_2;
+        rewardTokenOracle = config.rewardTokenOracle;
+        baseAssetOracle = config.baseAssetOracle;
         curvePool1_rewardIndex = config.curvePool1_rewardIndex;
         curvePool1_baseAssetIndex = config.curvePool1_baseAssetIndex;
         curvePool2_assetIndex = config.curvePool2_assetIndex;
@@ -125,22 +146,19 @@ contract AutoPounder {
 
     /**
      * @notice Executes the full auto-compounding workflow
-     * @param minRewardAmount Minimum reward tokens expected from claim
-     * @param minBaseAssetAmount Minimum base asset expected from swap
-     * @param minLPTokens Minimum LP tokens expected from liquidity add
+     * @dev All minimum outputs are calculated internally using oracle prices and minOutputBps
      */
-    function compound(uint256 minRewardAmount, uint256 minBaseAssetAmount, uint256 minLPTokens) external {
+    function compound() external {
         // Step 1: Claim rewards from accountant via processor
         uint256 rewardAmount = _claimRewards();
-        if (rewardAmount < minRewardAmount) revert InsufficientOutput();
         emit RewardsClaimed(vault, rewardAmount);
 
         // Step 2: Transfer rewards to this contract via processor
         _transferRewardsToSelf(rewardAmount);
 
         // Step 3: Swap rewards for base asset in Curve pool #1
+        // minOut is calculated inside using oracle prices
         uint256 baseAssetAmount = _swapRewardForBaseAsset(rewardAmount);
-        if (baseAssetAmount < minBaseAssetAmount) revert InsufficientOutput();
         emit RewardsSwapped(rewardAmount, baseAssetAmount);
 
         // Step 4: Deposit base asset into ERC4626 vault #1
@@ -149,7 +167,6 @@ contract AutoPounder {
 
         // Step 5: Single-sided deposit into Curve pool #2
         uint256 lpTokenAmount = _addLiquiditySingleSided(intermediateShares);
-        if (lpTokenAmount < minLPTokens) revert InsufficientOutput();
         emit LiquidityAdded(intermediateShares, lpTokenAmount);
 
         // Step 6: Transfer LP tokens back to vault via processor
@@ -173,6 +190,8 @@ contract AutoPounder {
         curvePool2 = config.curvePool2;
         erc4626_1 = config.erc4626_1;
         erc4626_2 = config.erc4626_2;
+        rewardTokenOracle = config.rewardTokenOracle;
+        baseAssetOracle = config.baseAssetOracle;
         curvePool1_rewardIndex = config.curvePool1_rewardIndex;
         curvePool1_baseAssetIndex = config.curvePool1_baseAssetIndex;
         curvePool2_assetIndex = config.curvePool2_assetIndex;
@@ -198,6 +217,14 @@ contract AutoPounder {
     function setMinOutputBps(uint256 _minOutputBps) external onlyOwner {
         require(_minOutputBps <= 10000, "Invalid BPS");
         minOutputBps = _minOutputBps;
+    }
+
+    /**
+     * @notice Updates maximum oracle age threshold
+     * @param _maxOracleAge New maximum oracle age in seconds
+     */
+    function setMaxOracleAge(uint256 _maxOracleAge) external onlyOwner {
+        maxOracleAge = _maxOracleAge;
     }
 
     /**
@@ -273,8 +300,9 @@ contract AutoPounder {
         // Approve Curve pool to spend reward tokens
         IERC20(rewardToken).approve(curvePool1, amount);
 
-        // Calculate minimum output with slippage protection
-        uint256 minOut = (amount * minOutputBps) / 10000;
+        // Calculate minimum output using oracle prices and slippage protection
+        uint256 expectedOutput = _calculateExpectedOutput(amount, rewardTokenOracle, baseAssetOracle);
+        uint256 minOut = (expectedOutput * minOutputBps) / 10000;
 
         // Execute Curve exchange
         // exchange(int128 i, int128 j, uint256 dx, uint256 min_dy)
@@ -375,6 +403,42 @@ contract AutoPounder {
     }
 
     /**
+     * @dev Calculates expected output amount using Chainlink oracles
+     * @param inputAmount Amount of input token
+     * @param inputOracle Chainlink oracle for input token
+     * @param outputOracle Chainlink oracle for output token
+     * @return expectedOutput Expected amount of output token
+     */
+    function _calculateExpectedOutput(uint256 inputAmount, address inputOracle, address outputOracle)
+        internal
+        view
+        returns (uint256 expectedOutput)
+    {
+        // Get and validate input price
+        (, int256 inputPrice,, uint256 updatedAt1,) = AggregatorV3Interface(inputOracle).latestRoundData();
+        require(inputPrice > 0, "Invalid input price");
+        if (block.timestamp - updatedAt1 > maxOracleAge) revert StaleOraclePrice();
+
+        // Get and validate output price
+        (, int256 outputPrice,, uint256 updatedAt2,) = AggregatorV3Interface(outputOracle).latestRoundData();
+        require(outputPrice > 0, "Invalid output price");
+        if (block.timestamp - updatedAt2 > maxOracleAge) revert StaleOraclePrice();
+
+        // Get oracle decimals
+        uint8 inputDecimals = AggregatorV3Interface(inputOracle).decimals();
+        uint8 outputDecimals = AggregatorV3Interface(outputOracle).decimals();
+
+        // Calculate: (inputAmount * inputPrice) / outputPrice, adjusting for decimals
+        if (inputDecimals >= outputDecimals) {
+            expectedOutput = (inputAmount * uint256(inputPrice))
+                / (uint256(outputPrice) * 10 ** (inputDecimals - outputDecimals));
+        } else {
+            expectedOutput = (inputAmount * uint256(inputPrice) * 10 ** (outputDecimals - inputDecimals))
+                / uint256(outputPrice);
+        }
+    }
+
+    /**
      * @dev Validates that configuration addresses are non-zero
      */
     function _validateConfig() internal view {
@@ -387,6 +451,8 @@ contract AutoPounder {
         if (curvePool2 == address(0)) revert InvalidCurvePool();
         if (erc4626_1 == address(0)) revert InvalidERC4626();
         if (erc4626_2 == address(0)) revert InvalidERC4626();
+        if (rewardTokenOracle == address(0)) revert InvalidOracle();
+        if (baseAssetOracle == address(0)) revert InvalidOracle();
     }
 }
 
