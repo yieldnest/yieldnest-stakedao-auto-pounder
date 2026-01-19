@@ -7,12 +7,31 @@ import {MainnetContracts} from "../../script/Contracts.sol";
 import {MainnetActors} from "../../script/Actors.sol";
 
 interface IVault {
+    enum ParamType {
+        UINT256,
+        ADDRESS
+    }
+
+    struct ParamRule {
+        ParamType paramType;
+        bool isArray;
+        address[] allowList;
+    }
+
+    struct FunctionRule {
+        bool isActive;
+        ParamRule[] paramRules;
+        address validator; // IValidator
+    }
+
     function getAssets() external view returns (address[] memory);
     function processor(address[] calldata targets, uint256[] calldata values, bytes[] calldata data)
         external
         returns (bytes[] memory);
     function grantRole(bytes32 role, address account) external;
     function PROCESSOR_ROLE() external view returns (bytes32);
+    function PROCESSOR_MANAGER_ROLE() external view returns (bytes32);
+    function setProcessorRule(address target, bytes4 functionSig, FunctionRule calldata rule) external;
 }
 
 contract BaseIntegrationTest is Test {
@@ -83,9 +102,46 @@ contract BaseIntegrationTest is Test {
         // Grant PROCESSOR_ROLE to AutoPounder
         // Note: In a real deployment, the vault admin would need to grant this role
         bytes32 processorRole = IVault(STAK).PROCESSOR_ROLE();
+        bytes32 processorManagerRole = IVault(STAK).PROCESSOR_MANAGER_ROLE();
 
-        // Use ADMIN from MainnetActors to grant the role
-        vm.prank(actors.ADMIN());
+        vm.startPrank(actors.ADMIN());
+
+        // Grant PROCESSOR_ROLE to AutoPounder
         IVault(STAK).grantRole(processorRole, address(autoPounder));
+
+        // Grant PROCESSOR_MANAGER_ROLE to ADMIN so we can create rules
+        IVault(STAK).grantRole(processorManagerRole, actors.ADMIN());
+
+        // Create rule to allow transferring CRV tokens to AutoPounder
+        // This allows: CRV.transfer(autoPounder, amount)
+        bytes4 transferSig = bytes4(keccak256("transfer(address,uint256)"));
+
+        IVault.ParamRule[] memory paramRules = new IVault.ParamRule[](2);
+
+        // First param: address recipient - restricted to AutoPounder only
+        address[] memory allowList = new address[](1);
+        allowList[0] = address(autoPounder);
+        paramRules[0] = IVault.ParamRule({
+            paramType: IVault.ParamType.ADDRESS,
+            isArray: false,
+            allowList: allowList
+        });
+
+        // Second param: uint256 amount - no restrictions
+        paramRules[1] = IVault.ParamRule({
+            paramType: IVault.ParamType.UINT256,
+            isArray: false,
+            allowList: new address[](0)
+        });
+
+        IVault.FunctionRule memory transferRule = IVault.FunctionRule({
+            isActive: true,
+            paramRules: paramRules,
+            validator: address(0)
+        });
+
+        IVault(STAK).setProcessorRule(CRV, transferSig, transferRule);
+
+        vm.stopPrank();
     }
 }
