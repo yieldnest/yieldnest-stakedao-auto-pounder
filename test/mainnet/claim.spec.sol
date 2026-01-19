@@ -58,15 +58,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
      * - All approvals and pool configurations are correct
      */
     function test_Compound() public {
-        // Setup: Grant AutoPounder necessary permissions on vault
-        // This would typically be done by vault owner/admin
-        vm.startPrank(vaultOwner);
-        // TODO: Set up processor rules on vault to allow AutoPounder to call:
-        // - accountant.claim()
-        // - rewardToken.transfer()
-        // - lpToken.approve()
-        // - erc4626_2.deposit()
-        vm.stopPrank();
+        // Note: PROCESSOR_ROLE is automatically granted in BaseIntegrationTest.setUp()
 
         // Check initial balances
         uint256 initialCRVBalance = IERC20(CRV).balanceOf(address(autoPounder));

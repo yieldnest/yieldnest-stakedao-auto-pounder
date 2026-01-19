@@ -4,16 +4,20 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {AutoPounder} from "../../src/AutoPounder.sol";
 import {MainnetContracts} from "../../script/Contracts.sol";
+import {MainnetActors} from "../../script/Actors.sol";
 
 interface IVault {
     function getAssets() external view returns (address[] memory);
     function processor(address[] calldata targets, uint256[] calldata values, bytes[] calldata data)
         external
         returns (bytes[] memory);
+    function grantRole(bytes32 role, address account) external;
+    function PROCESSOR_ROLE() external view returns (bytes32);
 }
 
 contract BaseIntegrationTest is Test {
     AutoPounder public autoPounder;
+    MainnetActors public actors;
 
     // Import all addresses from MainnetContracts
     address constant STAK = MainnetContracts.STAK;
@@ -34,6 +38,12 @@ contract BaseIntegrationTest is Test {
     address vaultOwner;
 
     function setUp() public virtual {
+        // Fork mainnet for integration testing
+        // vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
+
+        // Deploy actors contract to get admin address
+        actors = new MainnetActors();
+
         // Create test accounts
         deployer = makeAddr("deployer");
         vaultOwner = makeAddr("vaultOwner");
@@ -69,5 +79,13 @@ contract BaseIntegrationTest is Test {
         vm.startPrank(deployer);
         autoPounder = new AutoPounder(config);
         vm.stopPrank();
+
+        // Grant PROCESSOR_ROLE to AutoPounder
+        // Note: In a real deployment, the vault admin would need to grant this role
+        bytes32 processorRole = IVault(STAK).PROCESSOR_ROLE();
+
+        // Use ADMIN from MainnetActors to grant the role
+        vm.prank(actors.ADMIN());
+        IVault(STAK).grantRole(processorRole, address(autoPounder));
     }
 }
