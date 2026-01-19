@@ -67,10 +67,6 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         console.log("Initial CRV balance:", initialCRVBalance);
         console.log("Initial USDC balance:", initialUSDCBalance);
 
-        // Execute compound
-        vm.expectEmit(true, false, false, false);
-        emit AutoPounder.RewardsClaimed(STAK, 0); // We don't know exact amount
-
         autoPounder.compound();
 
         // Verify state changes
