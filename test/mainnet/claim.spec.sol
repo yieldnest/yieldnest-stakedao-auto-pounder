@@ -128,7 +128,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         assertEq(autoPounder.minOutputBps(), 9800, "MinOutputBps should be updated");
 
         // Should revert if setting above 10000
-        vm.expectRevert("Invalid BPS");
+        vm.expectRevert(AutoPounder.InvalidBPS.selector);
         autoPounder.setMinOutputBps(10001);
 
         vm.stopPrank();

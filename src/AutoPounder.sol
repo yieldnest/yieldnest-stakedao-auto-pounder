@@ -59,10 +59,16 @@ contract AutoPounder {
     error InvalidCurveRouter();
     error InvalidERC4626();
     error InvalidOracle();
+    error InvalidBPS();
+    error InvalidAddress();
+    error InvalidPrice();
+    error InvalidDestination();
     error StaleOraclePrice();
     error InsufficientOutput();
     error ProcessorCallFailed(uint256 index);
     error TransferFailed();
+    error CurveSwapFailed();
+    error ERC4626DepositFailed();
     error OnlyOwner();
 
     // ============================================
@@ -83,6 +89,10 @@ contract AutoPounder {
         address erc4626_1,
         address erc4626_2
     );
+    event MinOutputBpsUpdated(uint256 oldValue, uint256 newValue);
+    event MaxOracleAgeUpdated(uint256 oldValue, uint256 newValue);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event TokenRecovered(address indexed token, uint256 amount, address indexed destination);
 
     // ============================================
     // State Variables
@@ -228,8 +238,10 @@ contract AutoPounder {
      * @param _minOutputBps New minimum output in basis points (e.g., 9900 = 99%)
      */
     function setMinOutputBps(uint256 _minOutputBps) external onlyOwner {
-        require(_minOutputBps <= 10000, "Invalid BPS");
+        if (_minOutputBps > 10000) revert InvalidBPS();
+        uint256 oldValue = minOutputBps;
         minOutputBps = _minOutputBps;
+        emit MinOutputBpsUpdated(oldValue, _minOutputBps);
     }
 
     /**
@@ -237,23 +249,28 @@ contract AutoPounder {
      * @param _maxOracleAge New maximum oracle age in seconds
      */
     function setMaxOracleAge(uint256 _maxOracleAge) external onlyOwner {
+        uint256 oldValue = maxOracleAge;
         maxOracleAge = _maxOracleAge;
+        emit MaxOracleAgeUpdated(oldValue, _maxOracleAge);
     }
 
     /**
      * @notice Transfers ownership to a new address
      */
     function transferOwnership(address newOwner) external onlyOwner {
-        require(newOwner != address(0), "Invalid address");
+        if (newOwner == address(0)) revert InvalidAddress();
+        address oldOwner = owner;
         owner = newOwner;
+        emit OwnershipTransferred(oldOwner, newOwner);
     }
 
     /**
      * @notice Emergency function to recover stuck tokens to a specified destination
      */
     function recoverToken(address token, uint256 amount, address destination) external onlyOwner {
-        require(destination != address(0), "Invalid destination");
+        if (destination == address(0)) revert InvalidDestination();
         IERC20(token).transfer(destination, amount);
+        emit TokenRecovered(token, amount, destination);
     }
 
     // ============================================
@@ -334,7 +351,7 @@ contract AutoPounder {
         );
 
         (bool success, bytes memory result) = curveRouter.call(callData);
-        require(success, "Curve router swap failed");
+        if (!success) revert CurveSwapFailed();
 
         return abi.decode(result, (uint256));
     }
@@ -350,7 +367,7 @@ contract AutoPounder {
         bytes memory callData = abi.encodeWithSignature("deposit(uint256,address)", amount, address(this));
 
         (bool success, bytes memory result) = erc4626_1.call(callData);
-        require(success, "ERC4626 deposit failed");
+        if (!success) revert ERC4626DepositFailed();
 
         return abi.decode(result, (uint256));
     }
@@ -425,12 +442,12 @@ contract AutoPounder {
     {
         // Get and validate input price
         (, int256 inputPrice,, uint256 updatedAt1,) = AggregatorV3Interface(inputOracle).latestRoundData();
-        require(inputPrice > 0, "Invalid input price");
+        if (inputPrice <= 0) revert InvalidPrice();
         if (block.timestamp - updatedAt1 > maxOracleAge) revert StaleOraclePrice();
 
         // Get and validate output price
         (, int256 outputPrice,, uint256 updatedAt2,) = AggregatorV3Interface(outputOracle).latestRoundData();
-        require(outputPrice > 0, "Invalid output price");
+        if (outputPrice <= 0) revert InvalidPrice();
         if (block.timestamp - updatedAt2 > maxOracleAge) revert StaleOraclePrice();
 
         // Get oracle decimals
