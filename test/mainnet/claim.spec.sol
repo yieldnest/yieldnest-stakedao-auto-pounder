@@ -180,7 +180,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         uint256 initialOwnerBalance = IERC20(USDC).balanceOf(deployer);
 
         vm.startPrank(deployer);
-        autoPounder.recoverToken(USDC, 1000e6);
+        autoPounder.recoverToken(USDC, 1000e6, deployer);
         vm.stopPrank();
 
         uint256 finalOwnerBalance = IERC20(USDC).balanceOf(deployer);

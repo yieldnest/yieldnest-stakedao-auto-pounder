@@ -243,10 +243,11 @@ contract AutoPounder {
     }
 
     /**
-     * @notice Emergency function to recover stuck tokens
+     * @notice Emergency function to recover stuck tokens to a specified destination
      */
-    function recoverToken(address token, uint256 amount) external onlyOwner {
-        IERC20(token).transfer(owner, amount);
+    function recoverToken(address token, uint256 amount, address destination) external onlyOwner {
+        require(destination != address(0), "Invalid destination");
+        IERC20(token).transfer(destination, amount);
     }
 
     // ============================================
