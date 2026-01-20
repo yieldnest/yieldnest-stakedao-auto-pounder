@@ -377,12 +377,12 @@ contract AutoPounder {
 
         // For single-sided deposit, create amounts array with only one non-zero value
         // This assumes a 2-token pool; adjust if needed
-        uint256[2] memory amounts;
+        uint256[] memory amounts = new uint256[](2);
         amounts[uint256(uint128(curvePool2_assetIndex))] = amount;
 
-        // Call add_liquidity on the Curve pool (2-parameter version)
+        // Call add_liquidity on the Curve pool with dynamic array (no ETH needed)
         // Using 0 for min_lp_out temporarily for testing
-        return ICurvePool(curvePool2).add_liquidity(amounts, 0);
+        return ICurvePool(curvePool2).add_liquidity{value: 0}(amounts, 0);
     }
 
     /**
@@ -512,9 +512,6 @@ interface IERC20Metadata {
 }
 
 interface ICurvePool {
-    function add_liquidity(uint256[2] calldata amounts, uint256 min_mint_amount) external returns (uint256);
-    function add_liquidity(uint256[2] calldata amounts, uint256 min_mint_amount, address receiver)
-        external
-        returns (uint256);
+    function add_liquidity(uint256[] calldata amounts, uint256 min_mint_amount) external payable returns (uint256);
     function lp_token() external view returns (address);
 }
