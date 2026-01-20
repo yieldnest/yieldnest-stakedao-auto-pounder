@@ -43,6 +43,8 @@ contract AutoPounder {
         address[5] swapPools; // Pools for rewardToken -> baseAsset swap
         uint256[5][5] swapParams; // Swap parameters for Curve router
         int128 curvePool2_assetIndex;
+        uint256 minOutputBps; // Slippage protection (basis points, e.g., 9900 = 99% = 1% slippage)
+        uint256 maxOracleAge; // Oracle staleness threshold (e.g., 86400 = 24 hours)
     }
 
     // ============================================
@@ -109,10 +111,10 @@ contract AutoPounder {
     int128 public curvePool2_assetIndex;
 
     // Slippage protection (basis points, e.g., 9900 = 99% = 1% slippage)
-    uint256 public minOutputBps = 9900;
+    uint256 public minOutputBps;
 
     // Oracle staleness threshold (e.g., 86400 = 24 hours)
-    uint256 public maxOracleAge = 86400;
+    uint256 public maxOracleAge;
 
     // ============================================
     // Modifiers
@@ -142,6 +144,8 @@ contract AutoPounder {
         swapPools = config.swapPools;
         swapParams = config.swapParams;
         curvePool2_assetIndex = config.curvePool2_assetIndex;
+        minOutputBps = config.minOutputBps;
+        maxOracleAge = config.maxOracleAge;
 
         _validateConfig();
     }
@@ -202,6 +206,8 @@ contract AutoPounder {
         swapPools = config.swapPools;
         swapParams = config.swapParams;
         curvePool2_assetIndex = config.curvePool2_assetIndex;
+        minOutputBps = config.minOutputBps;
+        maxOracleAge = config.maxOracleAge;
 
         _validateConfig();
 

@@ -102,7 +102,9 @@ contract BaseIntegrationTest is Test {
             swapRoute: swapRoute,
             swapPools: swapPools,
             swapParams: swapParams,
-            curvePool2_assetIndex: CURVE_STAK_ASSET_INDEX
+            curvePool2_assetIndex: CURVE_STAK_ASSET_INDEX,
+            minOutputBps: 9900,
+            maxOracleAge: 86400
         });
 
         // Deploy AutoPounder

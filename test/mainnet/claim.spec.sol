@@ -106,7 +106,9 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
             swapRoute: dummyRoute,
             swapPools: dummyPools,
             swapParams: dummyParams,
-            curvePool2_assetIndex: 0
+            curvePool2_assetIndex: 0,
+            minOutputBps: 9900,
+            maxOracleAge: 86400
         });
 
         vm.startPrank(attacker);
