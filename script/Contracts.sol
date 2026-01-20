@@ -16,7 +16,8 @@ library MainnetContracts {
 
     /// @notice ynRWAx - ERC4626 vault for base asset (USDC)
     /// @dev This is erc4626_1 in AutoPounder
-    address public constant YN_RWAX = 0x01Ba69727E2860b37bc1a2bd56999c1aFb4C15D8; // TODO: Verify actual address
+    address public constant YN_RWAX = 0x01Ba69727E2860b37bc1a2bd56999c1aFb4C15D8;
+    address public constant YN_USDX = 0x3DB228FE836D99Ccb25Ec4dfdC80ED6d2CDdCB4b;
 
     // ============================================
     // StakeDAO Contracts
@@ -53,7 +54,7 @@ library MainnetContracts {
     address public constant CURVE_STAK_POOL = 0xFFd3b4D343A8964a5C3c1caAc20f319C41A97BFF;
 
     /// @notice Index for single-sided deposit in STAK pool
-    int128 public constant CURVE_STAK_ASSET_INDEX = 0;
+    int128 public constant CURVE_STAK_ASSET_INDEX = 1;
 
     // Curve swap route for CRV -> USDC
     // Route: CRV -> TriCRV pool -> crvUSD -> crvUSD/USDC pool -> USDC
@@ -63,14 +64,14 @@ library MainnetContracts {
         route[2] = 0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E; // crvUSD
         route[3] = 0x4DEcE678ceceb27446b35C672dC7d61F30bAD69E; // crvUSD/USDC pool
         route[4] = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48; // USDC
-        // Rest are zero addresses
+            // Rest are zero addresses
     }
 
     // Curve swap pools for CRV -> USDC
     function getSwapPools() internal pure returns (address[5] memory pools) {
         pools[0] = 0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14; // TriCRV pool
         pools[1] = 0x4DEcE678ceceb27446b35C672dC7d61F30bAD69E; // crvUSD/USDC pool
-        // Rest are zero addresses
+            // Rest are zero addresses
     }
 
     // ============================================

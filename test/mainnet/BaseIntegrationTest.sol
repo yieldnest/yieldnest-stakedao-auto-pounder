@@ -45,6 +45,7 @@ contract BaseIntegrationTest is Test {
     address constant USDC = MainnetContracts.USDC;
     address constant GAUGE = MainnetContracts.GAUGE;
     address constant YN_RWAX = MainnetContracts.YN_RWAX;
+    address constant YN_USDX = MainnetContracts.YN_USDX;
     address constant CURVE_ROUTER = MainnetContracts.CURVE_ROUTER;
     address constant CURVE_STAK_POOL = MainnetContracts.CURVE_STAK_POOL;
     address constant CHAINLINK_CRV_USD = MainnetContracts.CHAINLINK_CRV_USD;
@@ -94,7 +95,7 @@ contract BaseIntegrationTest is Test {
             baseAsset: USDC,
             curveRouter: CURVE_ROUTER,
             curvePool2: CURVE_STAK_POOL,
-            erc4626_1: YN_RWAX,
+            erc4626_1: YN_USDX,
             erc4626_2: erc4626_2,
             rewardTokenOracle: CHAINLINK_CRV_USD,
             baseAssetOracle: CHAINLINK_USDC_USD,
@@ -131,24 +132,14 @@ contract BaseIntegrationTest is Test {
         // First param: address recipient - restricted to AutoPounder only
         address[] memory allowList = new address[](1);
         allowList[0] = address(autoPounder);
-        paramRules[0] = IVault.ParamRule({
-            paramType: IVault.ParamType.ADDRESS,
-            isArray: false,
-            allowList: allowList
-        });
+        paramRules[0] = IVault.ParamRule({paramType: IVault.ParamType.ADDRESS, isArray: false, allowList: allowList});
 
         // Second param: uint256 amount - no restrictions
-        paramRules[1] = IVault.ParamRule({
-            paramType: IVault.ParamType.UINT256,
-            isArray: false,
-            allowList: new address[](0)
-        });
+        paramRules[1] =
+            IVault.ParamRule({paramType: IVault.ParamType.UINT256, isArray: false, allowList: new address[](0)});
 
-        IVault.FunctionRule memory transferRule = IVault.FunctionRule({
-            isActive: true,
-            paramRules: paramRules,
-            validator: address(0)
-        });
+        IVault.FunctionRule memory transferRule =
+            IVault.FunctionRule({isActive: true, paramRules: paramRules, validator: address(0)});
 
         IVault(STAK).setProcessorRule(CRV, transferSig, transferRule);
 
