@@ -389,11 +389,8 @@ contract AutoPounder {
      * @dev Step 6: Transfers LP tokens from this contract to vault
      */
     function _transferLPToVault(uint256 amount) internal {
-        // Get LP token address from Curve pool
-        address lpToken = ICurvePool(curvePool2).lp_token();
-
-        // Transfer LP tokens to vault
-        bool success = IERC20(lpToken).transfer(vault, amount);
+        // curvePool2 is the LP token itself
+        bool success = IERC20(curvePool2).transfer(vault, amount);
         if (!success) revert TransferFailed();
     }
 
@@ -401,16 +398,14 @@ contract AutoPounder {
      * @dev Step 7: Deposits LP tokens into ERC4626 #2 via vault processor
      */
     function _depositLPToVault(uint256 amount) internal returns (uint256) {
-        // Get LP token address
-        address lpToken = ICurvePool(curvePool2).lp_token();
-
+        // curvePool2 is the LP token itself
         // Prepare processor calls to approve and deposit
         address[] memory targets = new address[](2);
         uint256[] memory values = new uint256[](2);
         bytes[] memory data = new bytes[](2);
 
         // First call: approve ERC4626_2 to spend LP tokens
-        targets[0] = lpToken;
+        targets[0] = curvePool2;
         values[0] = 0;
         data[0] = abi.encodeWithSignature("approve(address,uint256)", erc4626_2, amount);
 
@@ -513,5 +508,4 @@ interface IERC20Metadata {
 
 interface ICurvePool {
     function add_liquidity(uint256[] calldata amounts, uint256 min_mint_amount) external payable returns (uint256);
-    function lp_token() external view returns (address);
 }
