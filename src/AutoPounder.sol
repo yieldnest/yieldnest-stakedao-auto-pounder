@@ -369,27 +369,20 @@ contract AutoPounder {
 
     /**
      * @dev Step 5: Single-sided deposit into Curve pool #2
+     * @param amount Amount of erc4626_1 shares to deposit
      */
     function _addLiquiditySingleSided(uint256 amount) internal returns (uint256) {
-        address lpToken = IERC4626(erc4626_1).asset();
-
-        // Approve Curve pool to spend the token
-        IERC20(lpToken).approve(curvePool2, amount);
+        // Approve Curve pool to spend the ERC4626 shares (not the underlying asset)
+        IERC20(erc4626_1).approve(curvePool2, amount);
 
         // For single-sided deposit, create amounts array with only one non-zero value
         // This assumes a 2-token pool; adjust if needed
         uint256[2] memory amounts;
         amounts[uint256(uint128(curvePool2_assetIndex))] = amount;
 
-        uint256 minLpOut = (amount * minOutputBps) / 10000;
-
-        // add_liquidity(uint256[2] amounts, uint256 min_mint_amount)
-        bytes memory callData = abi.encodeWithSignature("add_liquidity(uint256[2],uint256)", amounts, minLpOut);
-
-        (bool success, bytes memory result) = curvePool2.call(callData);
-        require(success, "Curve add_liquidity failed");
-
-        return abi.decode(result, (uint256));
+        // Call add_liquidity on the Curve pool (2-parameter version)
+        // Using 0 for min_lp_out temporarily for testing
+        return ICurvePool(curvePool2).add_liquidity(amounts, 0);
     }
 
     /**
@@ -397,8 +390,7 @@ contract AutoPounder {
      */
     function _transferLPToVault(uint256 amount) internal {
         // Get LP token address from Curve pool
-        (, bytes memory lpTokenData) = curvePool2.staticcall(abi.encodeWithSignature("lp_token()"));
-        address lpToken = abi.decode(lpTokenData, (address));
+        address lpToken = ICurvePool(curvePool2).lp_token();
 
         // Transfer LP tokens to vault
         bool success = IERC20(lpToken).transfer(vault, amount);
@@ -410,8 +402,7 @@ contract AutoPounder {
      */
     function _depositLPToVault(uint256 amount) internal returns (uint256) {
         // Get LP token address
-        (, bytes memory lpTokenData) = curvePool2.staticcall(abi.encodeWithSignature("lp_token()"));
-        address lpToken = abi.decode(lpTokenData, (address));
+        address lpToken = ICurvePool(curvePool2).lp_token();
 
         // Prepare processor calls to approve and deposit
         address[] memory targets = new address[](2);
@@ -473,8 +464,8 @@ contract AutoPounder {
 
         // Adjust for token decimals: convert from input token decimals to output token decimals
         if (inputTokenDecimals >= outputTokenDecimals) {
-            expectedOutput =
-                (inputAmount * priceRatio) / (10 ** inputOracleDecimals * 10 ** (inputTokenDecimals - outputTokenDecimals));
+            expectedOutput = (inputAmount * priceRatio)
+                / (10 ** inputOracleDecimals * 10 ** (inputTokenDecimals - outputTokenDecimals));
         } else {
             expectedOutput = (inputAmount * priceRatio * 10 ** (outputTokenDecimals - inputTokenDecimals))
                 / 10 ** inputOracleDecimals;
@@ -518,4 +509,12 @@ interface IERC4626 {
 
 interface IERC20Metadata {
     function decimals() external view returns (uint8);
+}
+
+interface ICurvePool {
+    function add_liquidity(uint256[2] calldata amounts, uint256 min_mint_amount) external returns (uint256);
+    function add_liquidity(uint256[2] calldata amounts, uint256 min_mint_amount, address receiver)
+        external
+        returns (uint256);
+    function lp_token() external view returns (address);
 }
