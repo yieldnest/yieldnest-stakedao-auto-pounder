@@ -65,14 +65,15 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         address[] memory stakAssets = IVault(STAK).getAssets();
         assertGe(stakAssets.length, 2, "STAK vault doesn't have 2 assets");
         address erc4626_2 = stakAssets[1];
+        address asset0 = stakAssets[0];
 
         IERC20 stakedLpToken = IERC20(erc4626_2);
-
 
         // Check initial balances
         uint256 initialCRVBalance = IERC20(CRV).balanceOf(address(autoPounder));
         uint256 initialUSDCBalance = IERC20(USDC).balanceOf(address(autoPounder));
-
+        uint256 initialVaultCRV = IERC20(CRV).balanceOf(address(STAK));
+        uint256 initialVaultAsset0 = IERC20(asset0).balanceOf(address(STAK));
         uint256 initialLpBalance = stakedLpToken.balanceOf(address(STAK));        
 
         autoPounder.compound();
@@ -80,12 +81,18 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         // Verify state changes
         uint256 finalCRVBalance = IERC20(CRV).balanceOf(address(autoPounder));
         uint256 finalUSDCBalance = IERC20(USDC).balanceOf(address(autoPounder));
+        uint256 finalVaultCRV = IERC20(CRV).balanceOf(address(STAK));
+        uint256 finalVaultAsset0 = IERC20(asset0).balanceOf(address(STAK));
 
         // After compounding, AutoPounder should have minimal residual balances
         // Most tokens should be compounded back into the vault
         assertEq(finalCRVBalance, initialCRVBalance, "CRV should be swapped");
         assertEq(finalUSDCBalance, initialUSDCBalance, "USDC should be deposited");
         assertGt(stakedLpToken.balanceOf(address(STAK)), initialLpBalance, "StakeDAO LP balance should increase after compounding");
+
+        // New assertions: Vault's CRV, asset0, and LP token balances should stay the same before and after
+        assertEq(finalVaultCRV, initialVaultCRV, "Vault CRV balance should not change");
+        assertEq(finalVaultAsset0, initialVaultAsset0, "Vault asset0 balance should not change");
     }
 
     /**
