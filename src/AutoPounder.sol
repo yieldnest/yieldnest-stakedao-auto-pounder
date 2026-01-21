@@ -198,7 +198,10 @@ contract AutoPounder {
     }
 
     /**
-     * @notice Updates configuration parameters
+     * @notice Updates configuration parameters for the auto-compounding workflow
+     * @dev Only callable by the contract owner. Validates all addresses after update.
+     * @param config The new configuration struct containing all protocol addresses, oracle settings,
+     *        swap route parameters, and slippage protection values
      */
     function updateConfig(Config memory config) external onlyOwner {
         vault = config.vault;
@@ -255,7 +258,9 @@ contract AutoPounder {
     }
 
     /**
-     * @notice Transfers ownership to a new address
+     * @notice Transfers ownership of the contract to a new address
+     * @dev Only callable by the current owner. Reverts if newOwner is the zero address.
+     * @param newOwner The address of the new owner to transfer ownership to
      */
     function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) revert InvalidAddress();
@@ -266,6 +271,10 @@ contract AutoPounder {
 
     /**
      * @notice Emergency function to recover stuck tokens to a specified destination
+     * @dev Only callable by the contract owner. Reverts if destination is the zero address.
+     * @param token The address of the ERC20 token to recover
+     * @param amount The amount of tokens to transfer
+     * @param destination The address to send the recovered tokens to
      */
     function recoverToken(address token, uint256 amount, address destination) external onlyOwner {
         if (destination == address(0)) revert InvalidDestination();
@@ -279,6 +288,7 @@ contract AutoPounder {
 
     /**
      * @dev Step 1: Claims rewards from accountant via vault processor
+     * @return The amount of reward tokens claimed (calculated as balance difference)
      */
     function _claimRewards() internal returns (uint256) {
         // Check balance before claim
@@ -312,6 +322,7 @@ contract AutoPounder {
 
     /**
      * @dev Step 2: Transfers reward tokens from vault to this contract
+     * @param amount The amount of reward tokens to transfer from the vault
      */
     function _transferRewardsToSelf(uint256 amount) internal {
         address[] memory targets = new address[](1);
@@ -330,6 +341,8 @@ contract AutoPounder {
 
     /**
      * @dev Step 3: Swaps reward token for base asset using Curve router
+     * @param amount The amount of reward tokens to swap
+     * @return The amount of base asset received from the swap
      */
     function _swapRewardForBaseAsset(uint256 amount) internal returns (uint256) {
         // Approve Curve router to spend reward tokens
@@ -358,6 +371,8 @@ contract AutoPounder {
 
     /**
      * @dev Step 4: Deposits base asset into ERC4626 vault
+     * @param amount The amount of base asset to deposit
+     * @return The number of ERC4626 shares received from the deposit
      */
     function _depositToERC4626_1(uint256 amount) internal returns (uint256) {
         // Approve ERC4626 to spend base asset
@@ -374,7 +389,8 @@ contract AutoPounder {
 
     /**
      * @dev Step 5: Single-sided deposit into Curve pool #2
-     * @param amount Amount of erc4626_1 shares to deposit
+     * @param amount The amount of erc4626_1 shares to deposit into the Curve pool
+     * @return The amount of LP tokens received from the liquidity provision
      */
     function _addLiquiditySingleSided(uint256 amount) internal returns (uint256) {
         // Approve Curve pool to spend the ERC4626 shares (not the underlying asset)
@@ -392,6 +408,7 @@ contract AutoPounder {
 
     /**
      * @dev Step 6: Transfers LP tokens from this contract to vault
+     * @param amount The amount of LP tokens to transfer to the vault
      */
     function _transferLPToVault(uint256 amount) internal {
         // curvePool2 is the LP token itself
@@ -401,6 +418,8 @@ contract AutoPounder {
 
     /**
      * @dev Step 7: Deposits LP tokens into ERC4626 #2 via vault processor
+     * @param amount The amount of LP tokens to deposit into the ERC4626 vault
+     * @return The number of ERC4626 shares received from the deposit
      */
     function _depositLPToVault(uint256 amount) internal returns (uint256) {
         // curvePool2 is the LP token itself
