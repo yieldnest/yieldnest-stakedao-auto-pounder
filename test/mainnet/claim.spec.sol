@@ -69,12 +69,12 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
 
         IERC20 stakedLpToken = IERC20(erc4626_2);
 
-        // Check initial balances
+        // Snapshot initial balances
         uint256 initialCRVBalance = IERC20(CRV).balanceOf(address(autoPounder));
         uint256 initialUSDCBalance = IERC20(USDC).balanceOf(address(autoPounder));
         uint256 initialVaultCRV = IERC20(CRV).balanceOf(address(STAK));
         uint256 initialVaultAsset0 = IERC20(asset0).balanceOf(address(STAK));
-        uint256 initialLpBalance = stakedLpToken.balanceOf(address(STAK));        
+        uint256 initialLpBalance = stakedLpToken.balanceOf(address(STAK));
 
         autoPounder.compound();
 
@@ -90,9 +90,22 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         assertEq(finalUSDCBalance, initialUSDCBalance, "USDC should be deposited");
         assertGt(stakedLpToken.balanceOf(address(STAK)), initialLpBalance, "StakeDAO LP balance should increase after compounding");
 
-        // New assertions: Vault's CRV, asset0, and LP token balances should stay the same before and after
+        // Vault's CRV, asset0 balances should stay the same before and after
         assertEq(finalVaultCRV, initialVaultCRV, "Vault CRV balance should not change");
         assertEq(finalVaultAsset0, initialVaultAsset0, "Vault asset0 balance should not change");
+
+        // ============================================
+        // Extra assertions: Verify complete workflow
+        // ============================================
+
+        // AutoPounder should have zero intermediate tokens (ynUSDx, Curve LP)
+        assertEq(IERC20(YN_USDX).balanceOf(address(autoPounder)), 0, "ynUSDx should be deposited to Curve");
+        assertEq(IERC20(CURVE_STAK_POOL).balanceOf(address(autoPounder)), 0, "Curve LP should be deposited to vault");
+
+        // Measure meaningful compound occurred
+        uint256 sharesGained = stakedLpToken.balanceOf(address(STAK)) - initialLpBalance;
+        assertGt(sharesGained, 0, "Should have gained meaningful ERC4626_2 shares");
+        assertGe(sharesGained, 1, "Should have gained at least 1 wei of shares");
     }
 
     /**
