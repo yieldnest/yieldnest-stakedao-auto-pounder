@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 
 interface AggregatorV3Interface {
     function decimals() external view returns (uint8);
@@ -24,8 +25,14 @@ interface AggregatorV3Interface {
  * 6. Deposits resulting LP tokens back into vault
  * 7. Deposits LP into ERC4626 vault (2nd asset of IVault)
  */
-contract AutoPounder {
+contract AutoPounder is AccessControlEnumerable {
     using SafeERC20 for IERC20;
+
+    // ============================================
+    // Roles
+    // ============================================
+    /// @notice Role identifier for addresses allowed to call compound()
+    bytes32 public constant COMPOUNDER_ROLE = keccak256("COMPOUNDER_ROLE");
 
     // ============================================
     // Structs
@@ -72,7 +79,7 @@ contract AutoPounder {
     error TransferFailed();
     error CurveSwapFailed();
     error ERC4626DepositFailed();
-    error OnlyOwner();
+    error Unauthorized();
 
     // ============================================
     // Events
@@ -94,13 +101,11 @@ contract AutoPounder {
     );
     event MinOutputBpsUpdated(uint256 oldValue, uint256 newValue);
     event MaxOracleAgeUpdated(uint256 oldValue, uint256 newValue);
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event TokenRecovered(address indexed token, uint256 amount, address indexed destination);
 
     // ============================================
     // State Variables
     // ============================================
-    address public owner;
     address public vault;
     address public accountant;
     address public gauge; // StakeDAO gauge to claim from
@@ -130,18 +135,16 @@ contract AutoPounder {
     uint256 public maxOracleAge;
 
     // ============================================
-    // Modifiers
-    // ============================================
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert OnlyOwner();
-        _;
-    }
-
-    // ============================================
     // Constructor
     // ============================================
-    constructor(Config memory config) {
-        owner = msg.sender;
+    /**
+     * @notice Initializes the AutoPounder contract with configuration and admin
+     * @param config The configuration struct containing all protocol addresses and parameters
+     * @param admin The address to be granted DEFAULT_ADMIN_ROLE for managing roles
+     */
+    constructor(Config memory config, address admin) {
+        if (admin == address(0)) revert InvalidAddress();
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
         vault = config.vault;
         accountant = config.accountant;
         gauge = config.gauge;
@@ -169,9 +172,15 @@ contract AutoPounder {
 
     /**
      * @notice Executes the full auto-compounding workflow
-     * @dev All minimum outputs are calculated internally using oracle prices and minOutputBps
+     * @dev All minimum outputs are calculated internally using oracle prices and minOutputBps.
+     *      If COMPOUNDER_ROLE has any members, only those addresses can call this function.
+     *      If no addresses have COMPOUNDER_ROLE, anyone can call this function.
      */
     function compound() external {
+        // If COMPOUNDER_ROLE has members, require caller to have the role
+        if (getRoleMemberCount(COMPOUNDER_ROLE) > 0 && !hasRole(COMPOUNDER_ROLE, msg.sender)) {
+            revert Unauthorized();
+        }
         // Step 1: Claim rewards from accountant via processor
         uint256 rewardAmount = _claimRewards();
         emit RewardsClaimed(vault, rewardAmount);
@@ -202,11 +211,11 @@ contract AutoPounder {
 
     /**
      * @notice Updates configuration parameters for the auto-compounding workflow
-     * @dev Only callable by the contract owner. Validates all addresses after update.
+     * @dev Only callable by addresses with DEFAULT_ADMIN_ROLE. Validates all addresses after update.
      * @param config The new configuration struct containing all protocol addresses, oracle settings,
      *        swap route parameters, and slippage protection values
      */
-    function updateConfig(Config memory config) external onlyOwner {
+    function updateConfig(Config memory config) external onlyRole(DEFAULT_ADMIN_ROLE) {
         vault = config.vault;
         accountant = config.accountant;
         gauge = config.gauge;
@@ -241,9 +250,10 @@ contract AutoPounder {
 
     /**
      * @notice Updates minimum output basis points for slippage protection
+     * @dev Only callable by addresses with DEFAULT_ADMIN_ROLE.
      * @param _minOutputBps New minimum output in basis points (e.g., 9900 = 99%)
      */
-    function setMinOutputBps(uint256 _minOutputBps) external onlyOwner {
+    function setMinOutputBps(uint256 _minOutputBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_minOutputBps > 10000) revert InvalidBPS();
         uint256 oldValue = minOutputBps;
         minOutputBps = _minOutputBps;
@@ -252,34 +262,23 @@ contract AutoPounder {
 
     /**
      * @notice Updates maximum oracle age threshold
+     * @dev Only callable by addresses with DEFAULT_ADMIN_ROLE.
      * @param _maxOracleAge New maximum oracle age in seconds
      */
-    function setMaxOracleAge(uint256 _maxOracleAge) external onlyOwner {
+    function setMaxOracleAge(uint256 _maxOracleAge) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 oldValue = maxOracleAge;
         maxOracleAge = _maxOracleAge;
         emit MaxOracleAgeUpdated(oldValue, _maxOracleAge);
     }
 
     /**
-     * @notice Transfers ownership of the contract to a new address
-     * @dev Only callable by the current owner. Reverts if newOwner is the zero address.
-     * @param newOwner The address of the new owner to transfer ownership to
-     */
-    function transferOwnership(address newOwner) external onlyOwner {
-        if (newOwner == address(0)) revert InvalidAddress();
-        address oldOwner = owner;
-        owner = newOwner;
-        emit OwnershipTransferred(oldOwner, newOwner);
-    }
-
-    /**
      * @notice Emergency function to recover stuck tokens to a specified destination
-     * @dev Only callable by the contract owner. Reverts if destination is the zero address.
+     * @dev Only callable by addresses with DEFAULT_ADMIN_ROLE. Reverts if destination is the zero address.
      * @param token The address of the ERC20 token to recover
      * @param amount The amount of tokens to transfer
      * @param destination The address to send the recovered tokens to
      */
-    function recoverToken(address token, uint256 amount, address destination) external onlyOwner {
+    function recoverToken(address token, uint256 amount, address destination) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (destination == address(0)) revert InvalidDestination();
         IERC20(token).safeTransfer(destination, amount);
         emit TokenRecovered(token, amount, destination);

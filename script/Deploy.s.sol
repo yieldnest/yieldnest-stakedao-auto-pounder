@@ -42,7 +42,6 @@ contract Deploy is Script {
         vm.serializeAddress(label(), "baseAssetOracle", autoPounder.baseAssetOracle());
         vm.serializeUint(label(), "minOutputBps", autoPounder.minOutputBps());
         vm.serializeUint(label(), "maxOracleAge", autoPounder.maxOracleAge());
-        vm.serializeAddress(label(), "owner", autoPounder.owner());
 
         string memory jsonOutput = vm.serializeAddress(label(), "deployer", deployer);
 
@@ -93,8 +92,8 @@ contract Deploy is Script {
 
         vm.startBroadcast();
 
-        // Deploy AutoPounder
-        autoPounder = new AutoPounder(config);
+        // Deploy AutoPounder with deployer as admin
+        autoPounder = new AutoPounder(config, deployer);
 
         vm.stopBroadcast();
 

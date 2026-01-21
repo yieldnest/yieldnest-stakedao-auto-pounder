@@ -107,9 +107,9 @@ contract BaseIntegrationTest is Test {
             maxOracleAge: 86400
         });
 
-        // Deploy AutoPounder
+        // Deploy AutoPounder with deployer as admin
         vm.startPrank(deployer);
-        autoPounder = new AutoPounder(config);
+        autoPounder = new AutoPounder(config, deployer);
         vm.stopPrank();
 
         // Grant PROCESSOR_ROLE to AutoPounder

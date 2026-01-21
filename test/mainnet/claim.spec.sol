@@ -6,6 +6,7 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {console} from "forge-std/console.sol";
 import {AutoPounder} from "../../src/AutoPounder.sol";
 import {IVault} from "./BaseIntegrationTest.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 /**
  * @title Spec
@@ -25,7 +26,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         assertEq(autoPounder.curveRouter(), CURVE_ROUTER, "Curve router mismatch");
         assertEq(autoPounder.rewardTokenOracle(), CHAINLINK_CRV_USD, "CRV oracle mismatch");
         assertEq(autoPounder.baseAssetOracle(), CHAINLINK_USDC_USD, "USDC oracle mismatch");
-        assertEq(autoPounder.owner(), deployer, "Owner mismatch");
+        assertTrue(autoPounder.hasRole(autoPounder.DEFAULT_ADMIN_ROLE(), deployer), "Admin role mismatch");
     }
 
     /**
@@ -115,9 +116,9 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
     }
 
     /**
-     * @notice Test that only owner can update configuration
+     * @notice Test that only admin can update configuration
      */
-    function test_OnlyOwnerCanUpdateConfig() public {
+    function test_OnlyAdminCanUpdateConfig() public {
         address attacker = makeAddr("attacker");
 
         address[11] memory dummyRoute;
@@ -145,7 +146,11 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         });
 
         vm.startPrank(attacker);
-        vm.expectRevert(AutoPounder.OnlyOwner.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, attacker, autoPounder.DEFAULT_ADMIN_ROLE()
+            )
+        );
         autoPounder.updateConfig(newConfig);
         vm.stopPrank();
     }
@@ -181,25 +186,30 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
     }
 
     /**
-     * @notice Test ownership transfer
+     * @notice Test admin role transfer
      */
-    function test_TransferOwnership() public {
-        address newOwner = makeAddr("newOwner");
+    function test_TransferAdminRole() public {
+        address newAdmin = makeAddr("newAdmin");
+        bytes32 adminRole = autoPounder.DEFAULT_ADMIN_ROLE();
 
         vm.startPrank(deployer);
-        autoPounder.transferOwnership(newOwner);
+        autoPounder.grantRole(adminRole, newAdmin);
+        autoPounder.renounceRole(adminRole, deployer);
         vm.stopPrank();
 
-        assertEq(autoPounder.owner(), newOwner, "Owner should be transferred");
+        assertTrue(autoPounder.hasRole(adminRole, newAdmin), "New admin should have role");
+        assertFalse(autoPounder.hasRole(adminRole, deployer), "Old admin should not have role");
 
-        // Old owner cannot update config
+        // Old admin cannot update config
         vm.startPrank(deployer);
-        vm.expectRevert(AutoPounder.OnlyOwner.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, deployer, adminRole)
+        );
         autoPounder.setMinOutputBps(9500);
         vm.stopPrank();
 
-        // New owner can update config
-        vm.startPrank(newOwner);
+        // New admin can update config
+        vm.startPrank(newAdmin);
         autoPounder.setMinOutputBps(9500);
         assertEq(autoPounder.minOutputBps(), 9500);
         vm.stopPrank();
@@ -249,6 +259,46 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         assertEq(autoPounder.swapRoute(0), CRV, "Route[0] should be CRV");
         assertEq(autoPounder.swapRoute(4), USDC, "Route[4] should be USDC");
         assertEq(autoPounder.curvePool2_assetIndex(), CURVE_STAK_ASSET_INDEX);
+    }
+
+    /**
+     * @notice Test that compound is permissionless when no COMPOUNDER_ROLE members exist
+     */
+    function test_CompoundPermissionless() public {
+        address randomUser = makeAddr("randomUser");
+        bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
+
+        // Verify no compounders are set
+        assertEq(autoPounder.getRoleMemberCount(compounderRole), 0, "No compounders should be set initially");
+
+        // Anyone should be able to compound when no COMPOUNDER_ROLE members exist
+        vm.prank(randomUser);
+        autoPounder.compound();
+    }
+
+    /**
+     * @notice Test that compound requires COMPOUNDER_ROLE when members exist
+     */
+    function test_CompoundRequiresRole() public {
+        address compounder = makeAddr("compounder");
+        address nonCompounder = makeAddr("nonCompounder");
+        bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
+
+        // Grant COMPOUNDER_ROLE to compounder
+        vm.prank(deployer);
+        autoPounder.grantRole(compounderRole, compounder);
+
+        // Verify role member count increased
+        assertEq(autoPounder.getRoleMemberCount(compounderRole), 1, "Should have 1 compounder");
+
+        // Non-compounder should be rejected
+        vm.prank(nonCompounder);
+        vm.expectRevert(AutoPounder.Unauthorized.selector);
+        autoPounder.compound();
+
+        // Compounder should be able to compound
+        vm.prank(compounder);
+        autoPounder.compound();
     }
 }
 
