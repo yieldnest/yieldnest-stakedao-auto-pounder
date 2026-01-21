@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {IERC20} from "forge-std/interfaces/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface AggregatorV3Interface {
     function decimals() external view returns (uint8);
@@ -24,6 +25,8 @@ interface AggregatorV3Interface {
  * 7. Deposits LP into ERC4626 vault (2nd asset of IVault)
  */
 contract AutoPounder {
+    using SafeERC20 for IERC20;
+
     // ============================================
     // Structs
     // ============================================
@@ -278,7 +281,7 @@ contract AutoPounder {
      */
     function recoverToken(address token, uint256 amount, address destination) external onlyOwner {
         if (destination == address(0)) revert InvalidDestination();
-        IERC20(token).transfer(destination, amount);
+        IERC20(token).safeTransfer(destination, amount);
         emit TokenRecovered(token, amount, destination);
     }
 
@@ -346,7 +349,7 @@ contract AutoPounder {
      */
     function _swapRewardForBaseAsset(uint256 amount) internal returns (uint256) {
         // Approve Curve router to spend reward tokens
-        IERC20(rewardToken).approve(curveRouter, amount);
+        IERC20(rewardToken).forceApprove(curveRouter, amount);
 
         // Calculate minimum output using oracle prices and slippage protection
         uint256 expectedOutput = _calculateExpectedOutput(amount, rewardTokenOracle, baseAssetOracle);
@@ -376,7 +379,7 @@ contract AutoPounder {
      */
     function _depositToERC4626_1(uint256 amount) internal returns (uint256) {
         // Approve ERC4626 to spend base asset
-        IERC20(baseAsset).approve(erc4626_1, amount);
+        IERC20(baseAsset).forceApprove(erc4626_1, amount);
 
         // Deposit and receive shares
         bytes memory callData = abi.encodeWithSignature("deposit(uint256,address)", amount, address(this));
@@ -394,7 +397,7 @@ contract AutoPounder {
      */
     function _addLiquiditySingleSided(uint256 amount) internal returns (uint256) {
         // Approve Curve pool to spend the ERC4626 shares (not the underlying asset)
-        IERC20(erc4626_1).approve(curvePool2, amount);
+        IERC20(erc4626_1).forceApprove(curvePool2, amount);
 
         // For single-sided deposit, create amounts array with only one non-zero value
         // This assumes a 2-token pool; adjust if needed
@@ -402,7 +405,9 @@ contract AutoPounder {
         amounts[uint256(uint128(curvePool2_assetIndex))] = amount;
 
         // Call add_liquidity on the Curve pool with dynamic array (no ETH needed)
-        // Using 0 for min_lp_out temporarily for testing
+        // Note: No slippage protection (min_mint_amount = 0) is acceptable here because:
+        // 1. This processes small reward amounts that don't justify sandwich attack costs
+        // 2. The pool assets are not easily redeemable, reducing MEV incentives
         return ICurvePool(curvePool2).add_liquidity{value: 0}(amounts, 0);
     }
 
