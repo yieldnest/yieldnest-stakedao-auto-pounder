@@ -64,14 +64,31 @@ library MainnetContracts {
         route[2] = 0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E; // crvUSD
         route[3] = 0x4DEcE678ceceb27446b35C672dC7d61F30bAD69E; // crvUSD/USDC pool
         route[4] = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48; // USDC
-            // Rest are zero addresses
+        route[5] = address(0);
+        route[6] = address(0);
+        route[7] = address(0);
+        route[8] = address(0);
+        route[9] = address(0);
+        route[10] = address(0);
     }
 
     // Curve swap pools for CRV -> USDC
     function getSwapPools() internal pure returns (address[5] memory pools) {
         pools[0] = 0x4eBdF703948ddCEA3B11f675B4D1Fba9d2414A14; // TriCRV pool
         pools[1] = 0x4DEcE678ceceb27446b35C672dC7d61F30bAD69E; // crvUSD/USDC pool
-            // Rest are zero addresses
+        pools[2] = address(0);
+        pools[3] = address(0);
+        pools[4] = address(0);
+    }
+
+    // Curve swap params for CRV -> USDC
+    // [i, j, swap_type, pool_type, n_coins] for each hop
+    function getSwapParams() internal pure returns (uint256[5][5] memory swapParams) {
+        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
+        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
+        swapParams[2] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
+        swapParams[3] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
+        swapParams[4] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
     }
 
     // ============================================

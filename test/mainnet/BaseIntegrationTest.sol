@@ -73,18 +73,10 @@ contract BaseIntegrationTest is Test {
         require(stakAssets.length >= 2, "STAK vault doesn't have 2 assets");
         address erc4626_2 = stakAssets[1];
 
-        // Get swap route and pools from MainnetContracts
+        // Get swap route, pools, and params from MainnetContracts
         address[11] memory swapRoute = MainnetContracts.getSwapRoute();
         address[5] memory swapPools = MainnetContracts.getSwapPools();
-
-        // Configure swap params: [i, j, swap_type, pool_type, n_coins] for each hop
-        // Values: 2,0,1,3,0,1,0,1,1,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-        uint256[5][5] memory swapParams;
-        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
-        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
-        swapParams[2] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
-        swapParams[3] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
-        swapParams[4] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
+        uint256[5][5] memory swapParams = MainnetContracts.getSwapParams();
 
         // Build AutoPounder configuration
         AutoPounder.Config memory config = AutoPounder.Config({

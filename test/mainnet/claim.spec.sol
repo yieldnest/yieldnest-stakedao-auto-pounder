@@ -312,9 +312,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
     function test_ConstructorRevertsZeroAdmin() public {
         address[11] memory swapRoute = MainnetContracts.getSwapRoute();
         address[5] memory swapPools = MainnetContracts.getSwapPools();
-        uint256[5][5] memory swapParams;
-        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
-        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
+        uint256[5][5] memory swapParams = MainnetContracts.getSwapParams();
 
         address[] memory stakAssets = IVault(STAK).getAssets();
         address erc4626_2 = stakAssets[1];
@@ -349,9 +347,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
     function test_ConstructorRevertsZeroVault() public {
         address[11] memory swapRoute = MainnetContracts.getSwapRoute();
         address[5] memory swapPools = MainnetContracts.getSwapPools();
-        uint256[5][5] memory swapParams;
-        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
-        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
+        uint256[5][5] memory swapParams = MainnetContracts.getSwapParams();
 
         address[] memory stakAssets = IVault(STAK).getAssets();
         address erc4626_2 = stakAssets[1];
@@ -386,9 +382,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
     function test_ConstructorRevertsZeroAccountant() public {
         address[11] memory swapRoute = MainnetContracts.getSwapRoute();
         address[5] memory swapPools = MainnetContracts.getSwapPools();
-        uint256[5][5] memory swapParams;
-        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
-        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
+        uint256[5][5] memory swapParams = MainnetContracts.getSwapParams();
 
         address[] memory stakAssets = IVault(STAK).getAssets();
         address erc4626_2 = stakAssets[1];
@@ -423,9 +417,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
     function test_ConstructorRevertsZeroOracle() public {
         address[11] memory swapRoute = MainnetContracts.getSwapRoute();
         address[5] memory swapPools = MainnetContracts.getSwapPools();
-        uint256[5][5] memory swapParams;
-        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
-        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
+        uint256[5][5] memory swapParams = MainnetContracts.getSwapParams();
 
         address[] memory stakAssets = IVault(STAK).getAssets();
         address erc4626_2 = stakAssets[1];

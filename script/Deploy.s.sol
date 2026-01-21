@@ -57,17 +57,10 @@ contract Deploy is Script {
         require(stakAssets.length >= 2, "STAK vault doesn't have 2 assets");
         erc4626_2 = stakAssets[1];
 
-        // Get swap route and pools
+        // Get swap route, pools, and params from MainnetContracts
         address[11] memory swapRoute = MC.getSwapRoute();
         address[5] memory swapPools = MC.getSwapPools();
-
-        // Configure swap params: [i, j, swap_type, pool_type, n_coins] for each hop
-        uint256[5][5] memory swapParams;
-        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
-        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
-        swapParams[2] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
-        swapParams[3] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
-        swapParams[4] = [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)];
+        uint256[5][5] memory swapParams = MC.getSwapParams();
 
         // Build AutoPounder configuration
         AutoPounder.Config memory config = AutoPounder.Config({
