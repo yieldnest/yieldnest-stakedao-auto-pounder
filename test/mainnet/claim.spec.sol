@@ -106,6 +106,8 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         uint256 sharesGained = stakedLpToken.balanceOf(address(STAK)) - initialLpBalance;
         assertGt(sharesGained, 0, "Should have gained meaningful ERC4626_2 shares");
         assertGe(sharesGained, 1, "Should have gained at least 1 wei of shares");
+
+        console.log("Shares gained (stakedLpToken):", sharesGained);
     }
 
     /**
