@@ -5,6 +5,7 @@ import {BaseIntegrationTest} from "./BaseIntegrationTest.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {console} from "forge-std/console.sol";
 import {AutoPounder} from "../../src/AutoPounder.sol";
+import {IVault} from "./BaseIntegrationTest.sol";
 
 /**
  * @title Spec
@@ -60,12 +61,19 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
     function test_Compound() public {
         // Note: PROCESSOR_ROLE is automatically granted in BaseIntegrationTest.setUp()
 
+        // Get the second asset from STAK vault (erc4626_2)
+        address[] memory stakAssets = IVault(STAK).getAssets();
+        assertGe(stakAssets.length, 2, "STAK vault doesn't have 2 assets");
+        address erc4626_2 = stakAssets[1];
+
+        IERC20 stakedLpToken = IERC20(erc4626_2);
+
+
         // Check initial balances
         uint256 initialCRVBalance = IERC20(CRV).balanceOf(address(autoPounder));
         uint256 initialUSDCBalance = IERC20(USDC).balanceOf(address(autoPounder));
 
-        console.log("Initial CRV balance:", initialCRVBalance);
-        console.log("Initial USDC balance:", initialUSDCBalance);
+        uint256 initialLpBalance = stakedLpToken.balanceOf(address(STAK));        
 
         autoPounder.compound();
 
@@ -73,12 +81,11 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         uint256 finalCRVBalance = IERC20(CRV).balanceOf(address(autoPounder));
         uint256 finalUSDCBalance = IERC20(USDC).balanceOf(address(autoPounder));
 
-        console.log("Final CRV balance:", finalCRVBalance);
-        console.log("Final USDC balance:", finalUSDCBalance);
-
         // After compounding, AutoPounder should have minimal residual balances
         // Most tokens should be compounded back into the vault
-        assertLt(finalCRVBalance, initialCRVBalance + 1e18, "CRV should be swapped");
+        assertEq(finalCRVBalance, initialCRVBalance, "CRV should be swapped");
+        assertEq(finalUSDCBalance, initialUSDCBalance, "USDC should be deposited");
+        assertGt(stakedLpToken.balanceOf(address(STAK)), initialLpBalance, "StakeDAO LP balance should increase after compounding");
     }
 
     /**
