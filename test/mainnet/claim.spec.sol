@@ -88,7 +88,11 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         // Most tokens should be compounded back into the vault
         assertEq(finalCRVBalance, initialCRVBalance, "CRV should be swapped");
         assertEq(finalUSDCBalance, initialUSDCBalance, "USDC should be deposited");
-        assertGt(stakedLpToken.balanceOf(address(STAK)), initialLpBalance, "StakeDAO LP balance should increase after compounding");
+        assertGt(
+            stakedLpToken.balanceOf(address(STAK)),
+            initialLpBalance,
+            "StakeDAO LP balance should increase after compounding"
+        );
 
         // Vault's CRV, asset0 balances should stay the same before and after
         assertEq(finalVaultCRV, initialVaultCRV, "Vault CRV balance should not change");
