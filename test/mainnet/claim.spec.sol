@@ -7,6 +7,7 @@ import {console} from "forge-std/console.sol";
 import {AutoPounder} from "../../src/AutoPounder.sol";
 import {IVault} from "./BaseIntegrationTest.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {MainnetContracts} from "../../script/Contracts.sol";
 
 /**
  * @title Spec
@@ -299,6 +300,454 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         // Compounder should be able to compound
         vm.prank(compounder);
         autoPounder.compound();
+    }
+
+    // ============================================
+    // Constructor Tests
+    // ============================================
+
+    /**
+     * @notice Test that constructor reverts with zero admin address
+     */
+    function test_ConstructorRevertsZeroAdmin() public {
+        address[11] memory swapRoute = MainnetContracts.getSwapRoute();
+        address[5] memory swapPools = MainnetContracts.getSwapPools();
+        uint256[5][5] memory swapParams;
+        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
+        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
+
+        address[] memory stakAssets = IVault(STAK).getAssets();
+        address erc4626_2 = stakAssets[1];
+
+        AutoPounder.Config memory config = AutoPounder.Config({
+            vault: STAK,
+            accountant: STAKEDAO_ACCOUNTANT,
+            gauge: GAUGE,
+            rewardToken: CRV,
+            baseAsset: USDC,
+            curveRouter: CURVE_ROUTER,
+            curvePool2: CURVE_STAK_POOL,
+            erc4626_1: YN_USDX,
+            erc4626_2: erc4626_2,
+            rewardTokenOracle: CHAINLINK_CRV_USD,
+            baseAssetOracle: CHAINLINK_USDC_USD,
+            swapRoute: swapRoute,
+            swapPools: swapPools,
+            swapParams: swapParams,
+            curvePool2_assetIndex: CURVE_STAK_ASSET_INDEX,
+            minOutputBps: 9900,
+            maxOracleAge: 86400
+        });
+
+        vm.expectRevert(AutoPounder.InvalidAddress.selector);
+        new AutoPounder(config, address(0));
+    }
+
+    /**
+     * @notice Test that constructor reverts with zero vault address
+     */
+    function test_ConstructorRevertsZeroVault() public {
+        address[11] memory swapRoute = MainnetContracts.getSwapRoute();
+        address[5] memory swapPools = MainnetContracts.getSwapPools();
+        uint256[5][5] memory swapParams;
+        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
+        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
+
+        address[] memory stakAssets = IVault(STAK).getAssets();
+        address erc4626_2 = stakAssets[1];
+
+        AutoPounder.Config memory config = AutoPounder.Config({
+            vault: address(0), // Invalid
+            accountant: STAKEDAO_ACCOUNTANT,
+            gauge: GAUGE,
+            rewardToken: CRV,
+            baseAsset: USDC,
+            curveRouter: CURVE_ROUTER,
+            curvePool2: CURVE_STAK_POOL,
+            erc4626_1: YN_USDX,
+            erc4626_2: erc4626_2,
+            rewardTokenOracle: CHAINLINK_CRV_USD,
+            baseAssetOracle: CHAINLINK_USDC_USD,
+            swapRoute: swapRoute,
+            swapPools: swapPools,
+            swapParams: swapParams,
+            curvePool2_assetIndex: CURVE_STAK_ASSET_INDEX,
+            minOutputBps: 9900,
+            maxOracleAge: 86400
+        });
+
+        vm.expectRevert(AutoPounder.InvalidVault.selector);
+        new AutoPounder(config, deployer);
+    }
+
+    /**
+     * @notice Test that constructor reverts with zero accountant address
+     */
+    function test_ConstructorRevertsZeroAccountant() public {
+        address[11] memory swapRoute = MainnetContracts.getSwapRoute();
+        address[5] memory swapPools = MainnetContracts.getSwapPools();
+        uint256[5][5] memory swapParams;
+        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
+        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
+
+        address[] memory stakAssets = IVault(STAK).getAssets();
+        address erc4626_2 = stakAssets[1];
+
+        AutoPounder.Config memory config = AutoPounder.Config({
+            vault: STAK,
+            accountant: address(0), // Invalid
+            gauge: GAUGE,
+            rewardToken: CRV,
+            baseAsset: USDC,
+            curveRouter: CURVE_ROUTER,
+            curvePool2: CURVE_STAK_POOL,
+            erc4626_1: YN_USDX,
+            erc4626_2: erc4626_2,
+            rewardTokenOracle: CHAINLINK_CRV_USD,
+            baseAssetOracle: CHAINLINK_USDC_USD,
+            swapRoute: swapRoute,
+            swapPools: swapPools,
+            swapParams: swapParams,
+            curvePool2_assetIndex: CURVE_STAK_ASSET_INDEX,
+            minOutputBps: 9900,
+            maxOracleAge: 86400
+        });
+
+        vm.expectRevert(AutoPounder.InvalidAccountant.selector);
+        new AutoPounder(config, deployer);
+    }
+
+    /**
+     * @notice Test that constructor reverts with zero oracle address
+     */
+    function test_ConstructorRevertsZeroOracle() public {
+        address[11] memory swapRoute = MainnetContracts.getSwapRoute();
+        address[5] memory swapPools = MainnetContracts.getSwapPools();
+        uint256[5][5] memory swapParams;
+        swapParams[0] = [uint256(2), uint256(0), uint256(1), uint256(3), uint256(0)];
+        swapParams[1] = [uint256(1), uint256(0), uint256(1), uint256(1), uint256(2)];
+
+        address[] memory stakAssets = IVault(STAK).getAssets();
+        address erc4626_2 = stakAssets[1];
+
+        AutoPounder.Config memory config = AutoPounder.Config({
+            vault: STAK,
+            accountant: STAKEDAO_ACCOUNTANT,
+            gauge: GAUGE,
+            rewardToken: CRV,
+            baseAsset: USDC,
+            curveRouter: CURVE_ROUTER,
+            curvePool2: CURVE_STAK_POOL,
+            erc4626_1: YN_USDX,
+            erc4626_2: erc4626_2,
+            rewardTokenOracle: address(0), // Invalid
+            baseAssetOracle: CHAINLINK_USDC_USD,
+            swapRoute: swapRoute,
+            swapPools: swapPools,
+            swapParams: swapParams,
+            curvePool2_assetIndex: CURVE_STAK_ASSET_INDEX,
+            minOutputBps: 9900,
+            maxOracleAge: 86400
+        });
+
+        vm.expectRevert(AutoPounder.InvalidOracle.selector);
+        new AutoPounder(config, deployer);
+    }
+
+    // ============================================
+    // Access Control Tests
+    // ============================================
+
+    /**
+     * @notice Test that non-admin cannot call setMinOutputBps
+     */
+    function test_OnlyAdminCanSetMinOutputBps() public {
+        address attacker = makeAddr("attacker");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, attacker, autoPounder.DEFAULT_ADMIN_ROLE()
+            )
+        );
+        vm.prank(attacker);
+        autoPounder.setMinOutputBps(9500);
+    }
+
+    /**
+     * @notice Test that non-admin cannot call setMaxOracleAge
+     */
+    function test_OnlyAdminCanSetMaxOracleAge() public {
+        address attacker = makeAddr("attacker");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, attacker, autoPounder.DEFAULT_ADMIN_ROLE()
+            )
+        );
+        vm.prank(attacker);
+        autoPounder.setMaxOracleAge(3600);
+    }
+
+    /**
+     * @notice Test that non-admin cannot call recoverToken
+     */
+    function test_OnlyAdminCanRecoverToken() public {
+        address attacker = makeAddr("attacker");
+
+        // Send some USDC to AutoPounder
+        deal(USDC, address(autoPounder), 1000e6);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, attacker, autoPounder.DEFAULT_ADMIN_ROLE()
+            )
+        );
+        vm.prank(attacker);
+        autoPounder.recoverToken(USDC, 1000e6, attacker);
+    }
+
+    /**
+     * @notice Test that recoverToken reverts with zero destination
+     */
+    function test_RecoverTokenRevertsZeroDestination() public {
+        deal(USDC, address(autoPounder), 1000e6);
+
+        vm.prank(deployer);
+        vm.expectRevert(AutoPounder.InvalidDestination.selector);
+        autoPounder.recoverToken(USDC, 1000e6, address(0));
+    }
+
+    // ============================================
+    // Edge Cases for minOutputBps
+    // ============================================
+
+    /**
+     * @notice Test setMinOutputBps at boundary values
+     */
+    function test_SetMinOutputBpsBoundaries() public {
+        vm.startPrank(deployer);
+
+        // Should succeed at 0 (no slippage protection)
+        autoPounder.setMinOutputBps(0);
+        assertEq(autoPounder.minOutputBps(), 0);
+
+        // Should succeed at 10000 (100% = no slippage allowed)
+        autoPounder.setMinOutputBps(10000);
+        assertEq(autoPounder.minOutputBps(), 10000);
+
+        // Should fail at 10001
+        vm.expectRevert(AutoPounder.InvalidBPS.selector);
+        autoPounder.setMinOutputBps(10001);
+
+        vm.stopPrank();
+    }
+
+    // ============================================
+    // COMPOUNDER_ROLE Management Tests
+    // ============================================
+
+    /**
+     * @notice Test adding multiple compounders
+     */
+    function test_MultipleCompounders() public {
+        address compounder1 = makeAddr("compounder1");
+        address compounder2 = makeAddr("compounder2");
+        address nonCompounder = makeAddr("nonCompounder");
+        bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
+
+        vm.startPrank(deployer);
+        autoPounder.grantRole(compounderRole, compounder1);
+        autoPounder.grantRole(compounderRole, compounder2);
+        vm.stopPrank();
+
+        assertEq(autoPounder.getRoleMemberCount(compounderRole), 2, "Should have 2 compounders");
+        assertTrue(autoPounder.hasRole(compounderRole, compounder1), "Compounder1 should have role");
+        assertTrue(autoPounder.hasRole(compounderRole, compounder2), "Compounder2 should have role");
+
+        // Non-compounder should be rejected
+        vm.prank(nonCompounder);
+        vm.expectRevert(AutoPounder.Unauthorized.selector);
+        autoPounder.compound();
+
+        // First compounder should succeed
+        vm.prank(compounder1);
+        autoPounder.compound();
+
+        // Note: Second compounder would also be allowed, but we don't call it here
+        // because rewards are depleted after first compound. The role check passes.
+        assertTrue(autoPounder.hasRole(compounderRole, compounder2), "Compounder2 still has role");
+    }
+
+    /**
+     * @notice Test revoking compounder role restores permissionless access
+     */
+    function test_RevokeCompounderRestoresPermissionless() public {
+        address compounder = makeAddr("compounder");
+        address randomUser = makeAddr("randomUser");
+        bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
+
+        // Grant role
+        vm.prank(deployer);
+        autoPounder.grantRole(compounderRole, compounder);
+
+        // Random user cannot compound
+        vm.prank(randomUser);
+        vm.expectRevert(AutoPounder.Unauthorized.selector);
+        autoPounder.compound();
+
+        // Revoke role
+        vm.prank(deployer);
+        autoPounder.revokeRole(compounderRole, compounder);
+
+        // Now anyone can compound again
+        assertEq(autoPounder.getRoleMemberCount(compounderRole), 0, "Should have 0 compounders");
+
+        vm.prank(randomUser);
+        autoPounder.compound();
+    }
+
+    /**
+     * @notice Test compounder can renounce their own role
+     */
+    function test_CompounderCanRenounceRole() public {
+        address compounder = makeAddr("compounder");
+        bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
+
+        // Grant role
+        vm.prank(deployer);
+        autoPounder.grantRole(compounderRole, compounder);
+
+        // Compounder renounces
+        vm.prank(compounder);
+        autoPounder.renounceRole(compounderRole, compounder);
+
+        assertFalse(autoPounder.hasRole(compounderRole, compounder), "Compounder should not have role");
+        assertEq(autoPounder.getRoleMemberCount(compounderRole), 0, "Should have 0 compounders");
+    }
+
+    /**
+     * @notice Test enumerating role members
+     */
+    function test_EnumerateRoleMembers() public {
+        address compounder1 = makeAddr("compounder1");
+        address compounder2 = makeAddr("compounder2");
+        address compounder3 = makeAddr("compounder3");
+        bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
+
+        vm.startPrank(deployer);
+        autoPounder.grantRole(compounderRole, compounder1);
+        autoPounder.grantRole(compounderRole, compounder2);
+        autoPounder.grantRole(compounderRole, compounder3);
+        vm.stopPrank();
+
+        assertEq(autoPounder.getRoleMemberCount(compounderRole), 3);
+
+        // Verify we can enumerate all members
+        address member0 = autoPounder.getRoleMember(compounderRole, 0);
+        address member1 = autoPounder.getRoleMember(compounderRole, 1);
+        address member2 = autoPounder.getRoleMember(compounderRole, 2);
+
+        // All three addresses should be present (order may vary)
+        bool hasCompounder1 = (member0 == compounder1 || member1 == compounder1 || member2 == compounder1);
+        bool hasCompounder2 = (member0 == compounder2 || member1 == compounder2 || member2 == compounder2);
+        bool hasCompounder3 = (member0 == compounder3 || member1 == compounder3 || member2 == compounder3);
+
+        assertTrue(hasCompounder1, "Should contain compounder1");
+        assertTrue(hasCompounder2, "Should contain compounder2");
+        assertTrue(hasCompounder3, "Should contain compounder3");
+    }
+
+    // ============================================
+    // Event Emission Tests
+    // ============================================
+
+    /**
+     * @notice Test MinOutputBpsUpdated event emission
+     */
+    function test_EmitMinOutputBpsUpdated() public {
+        vm.prank(deployer);
+        vm.expectEmit(true, true, true, true);
+        emit AutoPounder.MinOutputBpsUpdated(9900, 9500);
+        autoPounder.setMinOutputBps(9500);
+    }
+
+    /**
+     * @notice Test MaxOracleAgeUpdated event emission
+     */
+    function test_EmitMaxOracleAgeUpdated() public {
+        vm.prank(deployer);
+        vm.expectEmit(true, true, true, true);
+        emit AutoPounder.MaxOracleAgeUpdated(86400, 7200);
+        autoPounder.setMaxOracleAge(7200);
+    }
+
+    /**
+     * @notice Test TokenRecovered event emission
+     */
+    function test_EmitTokenRecovered() public {
+        deal(USDC, address(autoPounder), 1000e6);
+
+        vm.prank(deployer);
+        vm.expectEmit(true, true, true, true);
+        emit AutoPounder.TokenRecovered(USDC, 1000e6, deployer);
+        autoPounder.recoverToken(USDC, 1000e6, deployer);
+    }
+
+    // ============================================
+    // Multiple Admin Tests
+    // ============================================
+
+    /**
+     * @notice Test multiple admins can coexist
+     */
+    function test_MultipleAdmins() public {
+        address admin2 = makeAddr("admin2");
+        bytes32 adminRole = autoPounder.DEFAULT_ADMIN_ROLE();
+
+        // Grant admin role to second admin
+        vm.prank(deployer);
+        autoPounder.grantRole(adminRole, admin2);
+
+        // Both should be able to perform admin actions
+        vm.prank(deployer);
+        autoPounder.setMinOutputBps(9800);
+        assertEq(autoPounder.minOutputBps(), 9800);
+
+        vm.prank(admin2);
+        autoPounder.setMinOutputBps(9700);
+        assertEq(autoPounder.minOutputBps(), 9700);
+
+        // Verify enumeration
+        assertEq(autoPounder.getRoleMemberCount(adminRole), 2, "Should have 2 admins");
+    }
+
+    /**
+     * @notice Test that non-admin cannot grant roles
+     */
+    function test_NonAdminCannotGrantRoles() public {
+        address attacker = makeAddr("attacker");
+        address newCompounder = makeAddr("newCompounder");
+        bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, attacker, autoPounder.DEFAULT_ADMIN_ROLE()
+            )
+        );
+        vm.prank(attacker);
+        autoPounder.grantRole(compounderRole, newCompounder);
+    }
+
+    /**
+     * @notice Test DEFAULT_ADMIN_ROLE is admin of COMPOUNDER_ROLE
+     */
+    function test_AdminRoleIsCompounderRoleAdmin() public view {
+        bytes32 adminRole = autoPounder.DEFAULT_ADMIN_ROLE();
+        bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
+
+        assertEq(
+            autoPounder.getRoleAdmin(compounderRole), adminRole, "DEFAULT_ADMIN_ROLE should be admin of COMPOUNDER_ROLE"
+        );
     }
 }
 
