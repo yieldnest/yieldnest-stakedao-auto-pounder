@@ -4,4 +4,14 @@ out = "out"
 libs = ["lib"]
 fs_permissions = [{ access = "read-write", path = "./deployments" }]
 
+[profile.mainnet]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test/mainnet"
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
+
+[rpc_endpoints]
+mainnet = "${ETH_MAINNET_RPC_URL}"
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
