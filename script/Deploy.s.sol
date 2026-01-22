@@ -5,6 +5,7 @@ import {Script, stdJson} from "forge-std/Script.sol";
 import {Strings} from "openzeppelin/contracts/utils/Strings.sol";
 import {AutoPounder} from "../src/AutoPounder.sol";
 import {AutoPounderDeployer} from "./AutoPounderDeployer.sol";
+import {MainnetActors} from "./Actors.sol";
 
 /**
  * @title Deploy
@@ -51,7 +52,8 @@ contract Deploy is Script {
 
         vm.startBroadcast();
 
-        autoPounder = AutoPounderDeployer.deploy(deployer);
+        MainnetActors actors = new MainnetActors();
+        autoPounder = AutoPounderDeployer.deploy(actors.ADMIN());
 
         vm.stopBroadcast();
 
