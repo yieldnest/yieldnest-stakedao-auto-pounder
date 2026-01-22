@@ -210,6 +210,9 @@ contract AutoPounder is AccessControlEnumerable, ReentrancyGuard {
         // Step 7: Deposit LP into ERC4626 #2 (2nd asset in vault) via processor
         uint256 finalShares = _depositLPToVault(lpTokenAmount);
         emit LPDeposited(lpTokenAmount, finalShares);
+
+        // Step 8: Process accounting to update vault state
+        IVault(vault).processAccounting();
     }
 
     /**
@@ -525,6 +528,7 @@ interface IVault {
     function processor(address[] calldata targets, uint256[] calldata values, bytes[] calldata data)
         external
         returns (bytes[] memory);
+    function processAccounting() external;
 }
 
 interface IERC4626 {

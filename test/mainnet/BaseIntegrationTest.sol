@@ -29,6 +29,7 @@ interface IVault {
     function processor(address[] calldata targets, uint256[] calldata values, bytes[] calldata data)
         external
         returns (bytes[] memory);
+    function processAccounting() external;
     function grantRole(bytes32 role, address account) external;
     function PROCESSOR_ROLE() external view returns (bytes32);
     function PROCESSOR_MANAGER_ROLE() external view returns (bytes32);
