@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 interface AggregatorV3Interface {
     function decimals() external view returns (uint8);
@@ -25,7 +26,7 @@ interface AggregatorV3Interface {
  * 6. Deposits resulting LP tokens back into vault
  * 7. Deposits LP into ERC4626 vault (2nd asset of IVault)
  */
-contract AutoPounder is AccessControlEnumerable {
+contract AutoPounder is AccessControlEnumerable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ============================================
@@ -80,6 +81,7 @@ contract AutoPounder is AccessControlEnumerable {
     error CurveSwapFailed();
     error ERC4626DepositFailed();
     error Unauthorized();
+    error NoRewardsToClaim();
 
     // ============================================
     // Events
@@ -176,13 +178,14 @@ contract AutoPounder is AccessControlEnumerable {
      *      If COMPOUNDER_ROLE has any members, only those addresses can call this function.
      *      If no addresses have COMPOUNDER_ROLE, anyone can call this function.
      */
-    function compound() external {
+    function compound() external nonReentrant {
         // If COMPOUNDER_ROLE has members, require caller to have the role
         if (getRoleMemberCount(COMPOUNDER_ROLE) > 0 && !hasRole(COMPOUNDER_ROLE, msg.sender)) {
             revert Unauthorized();
         }
         // Step 1: Claim rewards from accountant via processor
         uint256 rewardAmount = _claimRewards();
+        if (rewardAmount == 0) revert NoRewardsToClaim();
         emit RewardsClaimed(vault, rewardAmount);
 
         // Step 2: Transfer rewards to this contract via processor
@@ -416,8 +419,7 @@ contract AutoPounder is AccessControlEnumerable {
      */
     function _transferLPToVault(uint256 amount) internal {
         // curvePool2 is the LP token itself
-        bool success = IERC20(curvePool2).transfer(vault, amount);
-        if (!success) revert TransferFailed();
+        IERC20(curvePool2).safeTransfer(vault, amount);
     }
 
     /**
