@@ -9,7 +9,7 @@ import {AutoPounderDeployer} from "./AutoPounderDeployer.sol";
 /**
  * @title Deploy
  * @notice Deployment script for AutoPounder contract
- * @dev Run with: forge script script/Deploy.s.sol:Deploy --rpc-url $RPC_URL --broadcast --verify
+ * @dev Run with: forge script script/Deploy.s.sol:Deploy --rpc-url $RPC_URL --broadcast --verify --sender <DEPLOYER_ADDRESS> --account <ACCOUNT_LABEL-DEPLOYER_ADDRESS>
  */
 contract Deploy is Script {
     using stdJson for string;
