@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Script, stdJson} from "forge-std/Script.sol";
 import {Strings} from "openzeppelin/contracts/utils/Strings.sol";
 import {AutoPounder} from "../src/AutoPounder.sol";
-import {MainnetContracts as MC} from "./Contracts.sol";
+import {AutoPounderDeployer} from "./AutoPounderDeployer.sol";
 
 /**
  * @title Deploy
@@ -16,8 +16,6 @@ contract Deploy is Script {
 
     address public deployer;
     AutoPounder public autoPounder;
-    address public vault;
-    address public erc4626_2;
 
     function label() public view returns (string memory) {
         return string.concat("autoPounder-", Strings.toString(block.chainid));
@@ -50,50 +48,13 @@ contract Deploy is Script {
 
     function run() public {
         deployer = msg.sender;
-        vault = MC.STAK;
-
-        // Get vault assets to determine erc4626_2
-        address[] memory stakAssets = IVault(vault).getAssets();
-        require(stakAssets.length >= 2, "STAK vault doesn't have 2 assets");
-        erc4626_2 = stakAssets[1];
-
-        // Get swap route, pools, and params from MainnetContracts
-        address[11] memory swapRoute = MC.getSwapRoute();
-        address[5] memory swapPools = MC.getSwapPools();
-        uint256[5][5] memory swapParams = MC.getSwapParams();
-
-        // Build AutoPounder configuration
-        AutoPounder.Config memory config = AutoPounder.Config({
-            vault: vault,
-            accountant: MC.STAKEDAO_ACCOUNTANT,
-            gauge: MC.GAUGE,
-            rewardToken: MC.CRV,
-            baseAsset: MC.USDC,
-            curveRouter: MC.CURVE_ROUTER,
-            curvePool2: MC.CURVE_STAK_POOL,
-            erc4626_1: MC.YN_USDX,
-            erc4626_2: erc4626_2,
-            rewardTokenOracle: MC.CHAINLINK_CRV_USD,
-            baseAssetOracle: MC.CHAINLINK_USDC_USD,
-            swapRoute: swapRoute,
-            swapPools: swapPools,
-            swapParams: swapParams,
-            curvePool2_assetIndex: MC.CURVE_STAK_ASSET_INDEX,
-            minOutputBps: 9900, // 99% = 1% slippage tolerance
-            maxOracleAge: 86400 // 24 hours
-        });
 
         vm.startBroadcast();
 
-        // Deploy AutoPounder with deployer as admin
-        autoPounder = new AutoPounder(config, deployer);
+        autoPounder = AutoPounderDeployer.deploy(deployer);
 
         vm.stopBroadcast();
 
         saveDeployment();
     }
-}
-
-interface IVault {
-    function getAssets() external view returns (address[] memory);
 }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {AutoPounder} from "../../src/AutoPounder.sol";
+import {AutoPounderDeployer} from "../../script/AutoPounderDeployer.sol";
 import {MainnetContracts} from "../../script/Contracts.sol";
 import {MainnetActors} from "../../script/Actors.sol";
 
@@ -59,7 +60,7 @@ contract BaseIntegrationTest is Test {
 
     function setUp() public virtual {
         // Fork mainnet for integration testing
-        // vm.createSelectFork(vm.envString("MAINNET_RPC_URL"));
+        vm.createSelectFork("mainnet");
 
         // Deploy actors contract to get admin address
         actors = new MainnetActors();
@@ -68,41 +69,9 @@ contract BaseIntegrationTest is Test {
         deployer = makeAddr("deployer");
         vaultOwner = makeAddr("vaultOwner");
 
-        // Get the second asset from STAK vault (erc4626_2)
-        address[] memory stakAssets = IVault(STAK).getAssets();
-        require(stakAssets.length >= 2, "STAK vault doesn't have 2 assets");
-        address erc4626_2 = stakAssets[1];
-
-        // Get swap route, pools, and params from MainnetContracts
-        address[11] memory swapRoute = MainnetContracts.getSwapRoute();
-        address[5] memory swapPools = MainnetContracts.getSwapPools();
-        uint256[5][5] memory swapParams = MainnetContracts.getSwapParams();
-
-        // Build AutoPounder configuration
-        AutoPounder.Config memory config = AutoPounder.Config({
-            vault: STAK,
-            accountant: STAKEDAO_ACCOUNTANT,
-            gauge: GAUGE,
-            rewardToken: CRV,
-            baseAsset: USDC,
-            curveRouter: CURVE_ROUTER,
-            curvePool2: CURVE_STAK_POOL,
-            erc4626_1: YN_USDX,
-            erc4626_2: erc4626_2,
-            rewardTokenOracle: CHAINLINK_CRV_USD,
-            baseAssetOracle: CHAINLINK_USDC_USD,
-            swapRoute: swapRoute,
-            swapPools: swapPools,
-            swapParams: swapParams,
-            curvePool2_assetIndex: CURVE_STAK_ASSET_INDEX,
-            minOutputBps: 9900,
-            maxOracleAge: 86400
-        });
-
-        // Deploy AutoPounder with deployer as admin
-        vm.startPrank(deployer);
-        autoPounder = new AutoPounder(config, deployer);
-        vm.stopPrank();
+        // Deploy AutoPounder using shared deployer library
+        vm.prank(deployer);
+        autoPounder = AutoPounderDeployer.deploy(deployer);
 
         // Grant PROCESSOR_ROLE to AutoPounder
         // Note: In a real deployment, the vault admin would need to grant this role
