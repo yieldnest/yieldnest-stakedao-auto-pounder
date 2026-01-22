@@ -60,8 +60,6 @@ contract BaseIntegrationTest is Test {
     address vaultOwner;
 
     function setUp() public virtual {
-        // Fork mainnet for integration testing
-        vm.createSelectFork("mainnet");
 
         // Deploy actors contract to get admin address
         actors = new MainnetActors();
