@@ -58,19 +58,21 @@ contract BaseIntegrationTest is Test {
     // Test accounts
     address deployer;
     address vaultOwner;
+    address admin;
 
     function setUp() public virtual {
 
         // Deploy actors contract to get admin address
         actors = new MainnetActors();
+        admin = actors.ADMIN();
 
         // Create test accounts
         deployer = makeAddr("deployer");
         vaultOwner = makeAddr("vaultOwner");
 
-        // Deploy AutoPounder using shared deployer library
+        // Deploy AutoPounder using shared deployer library with ADMIN as admin
         vm.prank(deployer);
-        autoPounder = AutoPounderDeployer.deploy(deployer);
+        autoPounder = AutoPounderDeployer.deploy(actors.ADMIN());
 
         // Grant PROCESSOR_ROLE to AutoPounder
         // Note: In a real deployment, the vault admin would need to grant this role

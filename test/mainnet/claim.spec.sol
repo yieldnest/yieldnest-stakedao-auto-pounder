@@ -8,6 +8,7 @@ import {AutoPounder} from "../../src/AutoPounder.sol";
 import {IVault} from "./BaseIntegrationTest.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {MainnetContracts} from "../../script/Contracts.sol";
+import {AutoPounderVerifier} from "../../script/AutoPounderVerifier.sol";
 
 /**
  * @title Spec
@@ -16,18 +17,10 @@ import {MainnetContracts} from "../../script/Contracts.sol";
  */
 contract ClaimIntegrationTest is BaseIntegrationTest {
     /**
-     * @notice Test that the AutoPounder is properly configured
+     * @notice Test that the AutoPounder is properly configured using shared verifier
      */
     function test_Configuration() public view {
-        assertEq(autoPounder.vault(), STAK, "Vault mismatch");
-        assertEq(autoPounder.accountant(), STAKEDAO_ACCOUNTANT, "Accountant mismatch");
-        assertEq(autoPounder.gauge(), GAUGE, "Gauge mismatch");
-        assertEq(autoPounder.rewardToken(), CRV, "Reward token mismatch");
-        assertEq(autoPounder.baseAsset(), USDC, "Base asset mismatch");
-        assertEq(autoPounder.curveRouter(), CURVE_ROUTER, "Curve router mismatch");
-        assertEq(autoPounder.rewardTokenOracle(), CHAINLINK_CRV_USD, "CRV oracle mismatch");
-        assertEq(autoPounder.baseAssetOracle(), CHAINLINK_USDC_USD, "USDC oracle mismatch");
-        assertTrue(autoPounder.hasRole(autoPounder.DEFAULT_ADMIN_ROLE(), deployer), "Admin role mismatch");
+        AutoPounderVerifier.verify(autoPounder);
     }
 
     /**
@@ -160,7 +153,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
      * @notice Test slippage protection parameter updates
      */
     function test_UpdateSlippageProtection() public {
-        vm.startPrank(deployer);
+        vm.startPrank(admin);
 
         // Update to 2% slippage (9800 bps)
         autoPounder.setMinOutputBps(9800);
@@ -177,7 +170,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
      * @notice Test oracle staleness parameter updates
      */
     function test_UpdateOracleStaleness() public {
-        vm.startPrank(deployer);
+        vm.startPrank(admin);
 
         // Update to 2 hours
         autoPounder.setMaxOracleAge(7200);
@@ -193,18 +186,18 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         address newAdmin = makeAddr("newAdmin");
         bytes32 adminRole = autoPounder.DEFAULT_ADMIN_ROLE();
 
-        vm.startPrank(deployer);
+        vm.startPrank(admin);
         autoPounder.grantRole(adminRole, newAdmin);
-        autoPounder.renounceRole(adminRole, deployer);
+        autoPounder.renounceRole(adminRole, admin);
         vm.stopPrank();
 
         assertTrue(autoPounder.hasRole(adminRole, newAdmin), "New admin should have role");
-        assertFalse(autoPounder.hasRole(adminRole, deployer), "Old admin should not have role");
+        assertFalse(autoPounder.hasRole(adminRole, admin), "Old admin should not have role");
 
         // Old admin cannot update config
-        vm.startPrank(deployer);
+        vm.startPrank(admin);
         vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, deployer, adminRole)
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, admin, adminRole)
         );
         autoPounder.setMinOutputBps(9500);
         vm.stopPrank();
@@ -223,13 +216,13 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         // Send some USDC to AutoPounder
         deal(USDC, address(autoPounder), 1000e6);
 
-        uint256 initialOwnerBalance = IERC20(USDC).balanceOf(deployer);
+        uint256 initialOwnerBalance = IERC20(USDC).balanceOf(admin);
 
-        vm.startPrank(deployer);
-        autoPounder.recoverToken(USDC, 1000e6, deployer);
+        vm.startPrank(admin);
+        autoPounder.recoverToken(USDC, 1000e6, admin);
         vm.stopPrank();
 
-        uint256 finalOwnerBalance = IERC20(USDC).balanceOf(deployer);
+        uint256 finalOwnerBalance = IERC20(USDC).balanceOf(admin);
 
         assertEq(finalOwnerBalance - initialOwnerBalance, 1000e6, "Owner should receive recovered tokens");
         assertEq(IERC20(USDC).balanceOf(address(autoPounder)), 0, "AutoPounder should have no USDC left");
@@ -240,7 +233,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
      */
     function test_RevertOnStaleOracle() public {
         // Set max oracle age to something very small
-        vm.startPrank(deployer);
+        vm.startPrank(admin);
         autoPounder.setMaxOracleAge(1);
         vm.stopPrank();
 
@@ -286,7 +279,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
 
         // Grant COMPOUNDER_ROLE to compounder
-        vm.prank(deployer);
+        vm.prank(admin);
         autoPounder.grantRole(compounderRole, compounder);
 
         // Verify role member count increased
@@ -504,7 +497,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
     function test_RecoverTokenRevertsZeroDestination() public {
         deal(USDC, address(autoPounder), 1000e6);
 
-        vm.prank(deployer);
+        vm.prank(admin);
         vm.expectRevert(AutoPounder.InvalidDestination.selector);
         autoPounder.recoverToken(USDC, 1000e6, address(0));
     }
@@ -517,7 +510,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
      * @notice Test setMinOutputBps at boundary values
      */
     function test_SetMinOutputBpsBoundaries() public {
-        vm.startPrank(deployer);
+        vm.startPrank(admin);
 
         // Should succeed at 0 (no slippage protection)
         autoPounder.setMinOutputBps(0);
@@ -547,7 +540,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         address nonCompounder = makeAddr("nonCompounder");
         bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
 
-        vm.startPrank(deployer);
+        vm.startPrank(admin);
         autoPounder.grantRole(compounderRole, compounder1);
         autoPounder.grantRole(compounderRole, compounder2);
         vm.stopPrank();
@@ -579,7 +572,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
 
         // Grant role
-        vm.prank(deployer);
+        vm.prank(admin);
         autoPounder.grantRole(compounderRole, compounder);
 
         // Random user cannot compound
@@ -588,7 +581,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         autoPounder.compound();
 
         // Revoke role
-        vm.prank(deployer);
+        vm.prank(admin);
         autoPounder.revokeRole(compounderRole, compounder);
 
         // Now anyone can compound again
@@ -606,7 +599,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
 
         // Grant role
-        vm.prank(deployer);
+        vm.prank(admin);
         autoPounder.grantRole(compounderRole, compounder);
 
         // Compounder renounces
@@ -626,7 +619,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         address compounder3 = makeAddr("compounder3");
         bytes32 compounderRole = autoPounder.COMPOUNDER_ROLE();
 
-        vm.startPrank(deployer);
+        vm.startPrank(admin);
         autoPounder.grantRole(compounderRole, compounder1);
         autoPounder.grantRole(compounderRole, compounder2);
         autoPounder.grantRole(compounderRole, compounder3);
@@ -657,7 +650,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
      * @notice Test MinOutputBpsUpdated event emission
      */
     function test_EmitMinOutputBpsUpdated() public {
-        vm.prank(deployer);
+        vm.prank(admin);
         vm.expectEmit(true, true, true, true);
         emit AutoPounder.MinOutputBpsUpdated(9900, 9500);
         autoPounder.setMinOutputBps(9500);
@@ -667,7 +660,7 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
      * @notice Test MaxOracleAgeUpdated event emission
      */
     function test_EmitMaxOracleAgeUpdated() public {
-        vm.prank(deployer);
+        vm.prank(admin);
         vm.expectEmit(true, true, true, true);
         emit AutoPounder.MaxOracleAgeUpdated(86400, 7200);
         autoPounder.setMaxOracleAge(7200);
@@ -679,10 +672,10 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
     function test_EmitTokenRecovered() public {
         deal(USDC, address(autoPounder), 1000e6);
 
-        vm.prank(deployer);
+        vm.prank(admin);
         vm.expectEmit(true, true, true, true);
-        emit AutoPounder.TokenRecovered(USDC, 1000e6, deployer);
-        autoPounder.recoverToken(USDC, 1000e6, deployer);
+        emit AutoPounder.TokenRecovered(USDC, 1000e6, admin);
+        autoPounder.recoverToken(USDC, 1000e6, admin);
     }
 
     // ============================================
@@ -697,11 +690,11 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         bytes32 adminRole = autoPounder.DEFAULT_ADMIN_ROLE();
 
         // Grant admin role to second admin
-        vm.prank(deployer);
+        vm.prank(admin);
         autoPounder.grantRole(adminRole, admin2);
 
         // Both should be able to perform admin actions
-        vm.prank(deployer);
+        vm.prank(admin);
         autoPounder.setMinOutputBps(9800);
         assertEq(autoPounder.minOutputBps(), 9800);
 
