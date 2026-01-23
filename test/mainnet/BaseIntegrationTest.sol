@@ -36,6 +36,10 @@ interface IVault {
     function setProcessorRule(address target, bytes4 functionSig, FunctionRule calldata rule) external;
 }
 
+interface IProcessAccountingGuardHook {
+    function setMaxTotalAssetsIncreaseRatio(uint256 _maxTotalAssetsIncreaseRatio) external;
+}
+
 contract BaseIntegrationTest is Test {
     AutoPounder public autoPounder;
     MainnetActors public actors;
@@ -106,6 +110,8 @@ contract BaseIntegrationTest is Test {
             IVault.FunctionRule({isActive: true, paramRules: paramRules, validator: address(0)});
 
         IVault(STAK).setProcessorRule(CRV, transferSig, transferRule);
+
+        IProcessAccountingGuardHook(0x6ae02e8F07aA8E0e39857f99ECd4E5152B534a84).setMaxTotalAssetsIncreaseRatio(10e15);
 
         vm.stopPrank();
     }
