@@ -29,8 +29,9 @@ echo "Generating constructor args via forge script..."
 
 # Run the ConstructorArgs script to generate the encoded constructor args
 # The output contains "0x..." in the logs, extract it
+# Use -E for extended regex (portable across Linux/macOS)
 CONSTRUCTOR_ARGS=$(forge script script/ConstructorArgs.s.sol:ConstructorArgs \
-    --rpc-url "$ETH_MAINNET_RPC_URL" 2>&1 | grep -o '0x[0-9a-fA-F]\{64,\}')
+    --rpc-url "$ETH_MAINNET_RPC_URL" 2>&1 | grep -oE '0x[0-9a-fA-F]{64,}')
 
 if [ -z "$CONSTRUCTOR_ARGS" ]; then
     echo "Error: Failed to generate constructor args"
@@ -40,6 +41,15 @@ fi
 echo "Constructor args: ${CONSTRUCTOR_ARGS:0:66}..."
 echo ""
 echo "Verifying bytecode..."
+echo ""
+echo "Command to run:"
+echo "forge verify-bytecode \\"
+echo "    --rpc-url \"\$ETH_MAINNET_RPC_URL\" \\"
+echo "    --etherscan-api-key \"\$ETHERSCAN_API_KEY\" \\"
+echo "    --encoded-constructor-args \"$CONSTRUCTOR_ARGS\" \\"
+echo "    \"$DEPLOYED_ADDRESS\" \\"
+echo "    src/AutoPounder.sol:AutoPounder"
+echo ""
 
 forge verify-bytecode \
     --rpc-url "$ETH_MAINNET_RPC_URL" \
