@@ -162,7 +162,7 @@ async function claimRewards(merkleData: MerkleData): Promise<string[]> {
 
     // Execute claim
     const tx = await retry(() =>
-      distributor.claim(checksumToken, stakVaultAddress, claim.amount, claim.proof),
+      distributor.claim(stakVaultAddress, checksumToken, claim.amount, claim.proof),
     );
     console.log(`Claim tx broadcast: ${tx.hash}`);
     const receipt = await tx.wait();
