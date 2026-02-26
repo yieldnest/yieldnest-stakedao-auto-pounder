@@ -30,8 +30,10 @@ contract AutoPounder is AccessControlEnumerable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ============================================
-    // Roles
+    // Constants
     // ============================================
+    string public constant VERSION = "0.2.0";
+
     /// @notice Role identifier for addresses allowed to call compound()
     bytes32 public constant COMPOUNDER_ROLE = keccak256("COMPOUNDER_ROLE");
 
@@ -81,7 +83,6 @@ contract AutoPounder is AccessControlEnumerable, ReentrancyGuard {
     error CurveSwapFailed();
     error ERC4626DepositFailed();
     error Unauthorized();
-    error NoRewardsToClaim();
 
     // ============================================
     // Events
@@ -183,35 +184,39 @@ contract AutoPounder is AccessControlEnumerable, ReentrancyGuard {
         if (getRoleMemberCount(COMPOUNDER_ROLE) > 0 && !hasRole(COMPOUNDER_ROLE, msg.sender)) {
             revert Unauthorized();
         }
-        // Step 1: Claim rewards from accountant via processor
-        uint256 rewardAmount = _claimRewards();
-        if (rewardAmount == 0) revert NoRewardsToClaim();
+        // Step 1: Claim rewards from accountant via processor (may claim 0)
+        _claimRewards();
+
+        // Step 2: Check total available reward token balance in vault
+        uint256 rewardAmount = IERC20(rewardToken).balanceOf(vault);
+        if (rewardAmount == 0) return;
+
         emit RewardsClaimed(vault, rewardAmount);
 
-        // Step 2: Transfer rewards to this contract via processor
+        // Step 3: Transfer all available rewards to this contract via processor
         _transferRewardsToSelf(rewardAmount);
 
-        // Step 3: Swap rewards for base asset in Curve pool #1
+        // Step 4: Swap rewards for base asset in Curve pool #1
         // minOut is calculated inside using oracle prices
         uint256 baseAssetAmount = _swapRewardForBaseAsset(rewardAmount);
         emit RewardsSwapped(rewardAmount, baseAssetAmount);
 
-        // Step 4: Deposit base asset into ERC4626 vault #1
+        // Step 5: Deposit base asset into ERC4626 vault #1
         uint256 intermediateShares = _depositToERC4626_1(baseAssetAmount);
         emit BaseAssetDeposited(baseAssetAmount, intermediateShares);
 
-        // Step 5: Single-sided deposit into Curve pool #2
+        // Step 6: Single-sided deposit into Curve pool #2
         uint256 lpTokenAmount = _addLiquiditySingleSided(intermediateShares);
         emit LiquidityAdded(intermediateShares, lpTokenAmount);
 
-        // Step 6: Transfer LP tokens back to vault via processor
+        // Step 7: Transfer LP tokens back to vault via processor
         _transferLPToVault(lpTokenAmount);
 
-        // Step 7: Deposit LP into ERC4626 #2 (2nd asset in vault) via processor
+        // Step 8: Deposit LP into ERC4626 #2 (2nd asset in vault) via processor
         uint256 finalShares = _depositLPToVault(lpTokenAmount);
         emit LPDeposited(lpTokenAmount, finalShares);
 
-        // Step 8: Process accounting to update vault state
+        // Step 9: Process accounting to update vault state
         IVault(vault).processAccounting();
     }
 
@@ -319,7 +324,8 @@ contract AutoPounder is AccessControlEnumerable, ReentrancyGuard {
         data[0] = abi.encodeWithSignature("claim(address[],bytes[])", claimTargets, claimData);
 
         // Execute via vault processor (claim() returns nothing)
-        IVault(vault).processor(targets, values, data);
+        // Use try/catch since claim may revert if already claimed for this period
+        try IVault(vault).processor(targets, values, data) {} catch {}
 
         // Check balance after claim to determine amount claimed
         uint256 balanceAfter = IERC20(rewardToken).balanceOf(vault);
