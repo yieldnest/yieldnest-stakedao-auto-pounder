@@ -18,6 +18,7 @@ export const chainId = 1;
 export const rpc: string = process.env.MAINNET_RPC_URL || "http://localhost:8545";
 export const MAX_FEE_PER_GAS_GWEI = Number(process.env.MAX_FEE_PER_GAS_GWEI || 0);
 export const MIN_EOA_ETH = Number(process.env.MIN_EOA_ETH || 0);
+export const DRY_RUN = process.env.DRY_RUN === "true";
 
 export const provider = new ethers.JsonRpcProvider(rpc);
 export const wallet = new ethers.Wallet(PRIVATE_KEY, provider);

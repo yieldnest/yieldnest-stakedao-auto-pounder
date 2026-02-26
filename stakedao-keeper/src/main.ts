@@ -8,6 +8,7 @@ import {
   merkleUrl,
   MAX_FEE_PER_GAS_GWEI,
   MIN_EOA_ETH,
+  DRY_RUN,
 } from "./utils/helpers";
 
 // ============================================
@@ -142,6 +143,12 @@ async function claimRewards(merkleData: MerkleData): Promise<string[]> {
     const balanceBefore: bigint = await erc20.balanceOf(stakVaultAddress);
     console.log(`Balance before claim: ${balanceBefore}`);
 
+    if (DRY_RUN) {
+      console.log(`[DRY RUN] Would claim token ${checksumToken}, amount: ${claim.amount}`);
+      claimedTokens.push(checksumToken);
+      continue;
+    }
+
     // Execute claim
     const tx = await retry(() =>
       distributor.claim(checksumToken, stakVaultAddress, claim.amount, claim.proof),
@@ -175,6 +182,12 @@ async function compound(): Promise<void> {
   );
 
   console.log("Calling compound() on AutoPounder...");
+
+  if (DRY_RUN) {
+    console.log(`[DRY RUN] Would call compound() on AutoPounder at ${AutoPounder.address}`);
+    return;
+  }
+
   const tx = await retry(() => autoPounder.compound());
   console.log(`Compound tx broadcast: ${tx.hash}`);
   const receipt = await tx.wait();
@@ -193,6 +206,7 @@ async function compound(): Promise<void> {
 async function main() {
   try {
     console.log("StakeDAO Keeper starting...");
+    if (DRY_RUN) console.log("[DRY RUN] Mode enabled - no transactions will be sent");
     console.log(`Wallet: ${wallet.address}`);
 
     // Pre-flight checks
