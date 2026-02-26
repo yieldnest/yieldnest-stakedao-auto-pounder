@@ -150,6 +150,16 @@ async function claimRewards(merkleData: MerkleData): Promise<string[]> {
       continue;
     }
 
+    // Log claim calldata for debugging
+    const calldata = distributor.interface.encodeFunctionData("claim", [
+      checksumToken,
+      stakVaultAddress,
+      claim.amount,
+      claim.proof,
+    ]);
+    console.log(`Claim calldata: ${calldata}`);
+    console.log(`Claim args: token=${checksumToken}, account=${stakVaultAddress}, amount=${claim.amount}, proofs=${JSON.stringify(claim.proof)}`);
+
     // Execute claim
     const tx = await retry(() =>
       distributor.claim(checksumToken, stakVaultAddress, claim.amount, claim.proof),
