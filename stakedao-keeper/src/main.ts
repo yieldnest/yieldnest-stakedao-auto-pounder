@@ -9,6 +9,7 @@ import {
   MAX_FEE_PER_GAS_GWEI,
   MIN_EOA_ETH,
   DRY_RUN,
+  SKIP_COMPOUND,
 } from "./utils/helpers";
 
 // ============================================
@@ -207,6 +208,7 @@ async function main() {
   try {
     console.log("StakeDAO Keeper starting...");
     if (DRY_RUN) console.log("[DRY RUN] Mode enabled - no transactions will be sent");
+    if (SKIP_COMPOUND) console.log("[SKIP_COMPOUND] Mode enabled - compound will be skipped");
     console.log(`Wallet: ${wallet.address}`);
 
     // Pre-flight checks
@@ -223,12 +225,16 @@ async function main() {
     console.log(`Claimed ${claimedTokens.length} token(s)`);
 
     // Step 2: Compound rewards via AutoPounder
-    await compound();
+    if (SKIP_COMPOUND) {
+      console.log("[SKIP_COMPOUND] Skipping compound() call on AutoPounder");
+    } else {
+      await compound();
+    }
 
     console.log("StakeDAO Keeper completed successfully");
     await ntfy(
       "StakeDAO Keeper",
-      `Claimed ${claimedTokens.length} token(s) and compounded`,
+      `Claimed ${claimedTokens.length} token(s)${SKIP_COMPOUND ? " (compound skipped)" : " and compounded"}`,
       "low",
       "white_check_mark",
     );
