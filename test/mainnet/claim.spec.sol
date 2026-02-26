@@ -67,7 +67,6 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
         // Snapshot initial balances
         uint256 initialCRVBalance = IERC20(CRV).balanceOf(address(autoPounder));
         uint256 initialUSDCBalance = IERC20(USDC).balanceOf(address(autoPounder));
-        uint256 initialVaultCRV = IERC20(CRV).balanceOf(address(STAK));
         uint256 initialVaultAsset0 = IERC20(asset0).balanceOf(address(STAK));
         uint256 initialLpBalance = stakedLpToken.balanceOf(address(STAK));
 
@@ -89,8 +88,9 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
             "StakeDAO LP balance should increase after compounding"
         );
 
-        // Vault's CRV, asset0 balances should stay the same before and after
-        assertEq(finalVaultCRV, initialVaultCRV, "Vault CRV balance should not change");
+        // Vault's CRV should be fully consumed (all available CRV is processed)
+        assertEq(finalVaultCRV, 0, "Vault CRV should be fully processed");
+        // Vault's asset0 balance should stay the same
         assertEq(finalVaultAsset0, initialVaultAsset0, "Vault asset0 balance should not change");
 
         // ============================================
@@ -732,6 +732,67 @@ contract ClaimIntegrationTest is BaseIntegrationTest {
 
         assertEq(
             autoPounder.getRoleAdmin(compounderRole), adminRole, "DEFAULT_ADMIN_ROLE should be admin of COMPOUNDER_ROLE"
+        );
+    }
+
+    // ============================================
+    // Version Tests
+    // ============================================
+
+    /**
+     * @notice Test that VERSION is set
+     */
+    function test_Version() public view {
+        bytes memory version = bytes(autoPounder.VERSION());
+        assertGt(version.length, 0, "VERSION should be set");
+    }
+
+    // ============================================
+    // No Rewards / Pre-existing Balance Tests
+    // ============================================
+
+    /**
+     * @notice Test that compound does not revert when gauge has no rewards
+     * @dev After first compound drains gauge rewards, second compound should
+     *      return gracefully instead of reverting
+     */
+    function test_CompoundDoesNotRevertWhenNoGaugeRewards() public {
+        // First compound to drain all available rewards from gauge
+        autoPounder.compound();
+
+        // Second compound - gauge has nothing to claim, vault should have no CRV
+        // Should return gracefully without reverting
+        autoPounder.compound();
+    }
+
+    /**
+     * @notice Test that compound processes pre-existing reward token balance in vault
+     * @dev Even if _claimRewards claims nothing new, compound should process any
+     *      reward tokens already sitting in the vault
+     */
+    function test_CompoundProcessesPreExistingRewardBalance() public {
+        // First compound to drain gauge rewards
+        autoPounder.compound();
+
+        // Deal some CRV directly to the vault (simulating pre-existing balance)
+        deal(CRV, STAK, 100e18);
+
+        // Get initial LP balance
+        address[] memory stakAssets = IVault(STAK).getAssets();
+        address erc4626_2 = stakAssets[1];
+        uint256 initialLpBalance = IERC20(erc4626_2).balanceOf(STAK);
+
+        // Second compound should process the pre-existing CRV
+        autoPounder.compound();
+
+        // Verify CRV was processed (vault should have no CRV left)
+        assertEq(IERC20(CRV).balanceOf(STAK), 0, "All CRV should be processed");
+
+        // Verify LP balance increased
+        assertGt(
+            IERC20(erc4626_2).balanceOf(STAK),
+            initialLpBalance,
+            "LP balance should increase from processing pre-existing CRV"
         );
     }
 }
