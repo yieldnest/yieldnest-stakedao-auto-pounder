@@ -8,6 +8,9 @@ set -e
 # - ETH_MAINNET_RPC_URL environment variable must be set
 # - ETHERSCAN_API_KEY environment variable must be set
 
+# Ensure we run from the repo root (where foundry.toml lives)
+cd "$(dirname "$0")/.."
+
 if [ -z "$1" ]; then
     echo "Usage: $0 <DEPLOYED_ADDRESS>"
     exit 1
@@ -48,7 +51,7 @@ echo "    --rpc-url \"\$ETH_MAINNET_RPC_URL\" \\"
 echo "    --etherscan-api-key \"\$ETHERSCAN_API_KEY\" \\"
 echo "    --encoded-constructor-args \"$CONSTRUCTOR_ARGS\" \\"
 echo "    \"$DEPLOYED_ADDRESS\" \\"
-echo "    src/AutoPounder.sol:AutoPounder"
+echo "    AutoPounder"
 echo ""
 
 forge verify-bytecode \
@@ -56,4 +59,4 @@ forge verify-bytecode \
     --etherscan-api-key "$ETHERSCAN_API_KEY" \
     --encoded-constructor-args "$CONSTRUCTOR_ARGS" \
     "$DEPLOYED_ADDRESS" \
-    src/AutoPounder.sol:AutoPounder
+    AutoPounder
