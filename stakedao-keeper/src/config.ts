@@ -17,7 +17,7 @@ export default {
       abi: AutoPounderAbi,
       network: {
         1: {
-          address: "0xbCb5f7D6E60aef80094d1399ce70174140eaB1a9" as Address,
+          address: "0xb96F35198E09E12a17c561D5f9Bc8595ECce94F6" as Address,
         },
       },
     },
