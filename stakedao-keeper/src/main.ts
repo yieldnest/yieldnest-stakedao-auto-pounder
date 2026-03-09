@@ -9,6 +9,7 @@ import {
   MAX_FEE_PER_GAS_GWEI,
   MIN_EOA_ETH,
   DRY_RUN,
+  SKIP_MERKL_CLAIM,
   SKIP_COMPOUND,
 } from "./utils/helpers";
 
@@ -218,6 +219,7 @@ async function main() {
   try {
     console.log("StakeDAO Keeper starting...");
     if (DRY_RUN) console.log("[DRY RUN] Mode enabled - no transactions will be sent");
+    if (SKIP_MERKL_CLAIM) console.log("[SKIP_MERKL_CLAIM] Mode enabled - merkl claim will be skipped");
     if (SKIP_COMPOUND) console.log("[SKIP_COMPOUND] Mode enabled - compound will be skipped");
     console.log(`Wallet: ${wallet.address}`);
 
@@ -230,9 +232,14 @@ async function main() {
     }
 
     // Step 1: Fetch merkle data and claim rewards
-    const merkleData = await fetchMerkleData();
-    const claimedTokens = await claimRewards(merkleData);
-    console.log(`Claimed ${claimedTokens.length} token(s)`);
+    let claimedTokens: string[] = [];
+    if (SKIP_MERKL_CLAIM) {
+      console.log("[SKIP_MERKL_CLAIM] Skipping merkl claim");
+    } else {
+      const merkleData = await fetchMerkleData();
+      claimedTokens = await claimRewards(merkleData);
+      console.log(`Claimed ${claimedTokens.length} token(s)`);
+    }
 
     // Step 2: Compound rewards via AutoPounder
     if (SKIP_COMPOUND) {
@@ -244,7 +251,7 @@ async function main() {
     console.log("StakeDAO Keeper completed successfully");
     await ntfy(
       "StakeDAO Keeper",
-      `Claimed ${claimedTokens.length} token(s)${SKIP_COMPOUND ? " (compound skipped)" : " and compounded"}`,
+      `${SKIP_MERKL_CLAIM ? "Merkl claim skipped" : `Claimed ${claimedTokens.length} token(s)`}${SKIP_COMPOUND ? " (compound skipped)" : " and compounded"}`,
       "low",
       "white_check_mark",
     );
